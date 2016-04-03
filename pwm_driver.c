@@ -142,7 +142,7 @@ void hard_pwm_setup(NRF_PWM_Type *pwm_reg, uint32_t pins[4])
                             (PWM_PSEL_OUT_CONNECT_Connected << PWM_PSEL_OUT_CONNECT_Pos);
     pwm_reg->PSEL.OUT[2] = (pins[2] << PWM_PSEL_OUT_PIN_Pos) | 
                             (PWM_PSEL_OUT_CONNECT_Connected << PWM_PSEL_OUT_CONNECT_Pos);
-    pwm_reg->PSEL.OUT[2] = (pins[3] << PWM_PSEL_OUT_PIN_Pos) | 
+    pwm_reg->PSEL.OUT[3] = (pins[3] << PWM_PSEL_OUT_PIN_Pos) | 
                             (PWM_PSEL_OUT_CONNECT_Connected << PWM_PSEL_OUT_CONNECT_Pos);
     
     pwm_reg->ENABLE      = (PWM_ENABLE_ENABLE_Enabled << PWM_ENABLE_ENABLE_Pos);
@@ -150,7 +150,13 @@ void hard_pwm_setup(NRF_PWM_Type *pwm_reg, uint32_t pins[4])
     pwm_reg->PRESCALER   = (PWM_PRESCALER_PRESCALER_DIV_16 << PWM_PRESCALER_PRESCALER_Pos);
     
     pwm_reg->COUNTERTOP  = (20000 << PWM_COUNTERTOP_COUNTERTOP_Pos);
-    pwm_reg->LOOP        = 0xFFFF;
+    //pwm_reg->LOOP        = 0xFFFF;
+    pwm_reg->SEQ[0].REFRESH  = 0;
+    pwm_reg->SEQ[0].ENDDELAY = 0;
+    
+    pwm_reg->SEQ[1].REFRESH  = 0;
+    pwm_reg->SEQ[1].ENDDELAY = 0;
+    
     pwm_reg->DECODER   = (PWM_DECODER_LOAD_Individual << PWM_DECODER_LOAD_Pos) | 
                           (PWM_DECODER_MODE_RefreshCount << PWM_DECODER_MODE_Pos);
     
@@ -203,49 +209,49 @@ void hexapod_servo_pwm_start()
     //leg 0
     if(hexapod_get_next_seq_value(0, &leg_init_values) != -1)
     {
-        pwm0_seq0.channel_0 = leg_init_values.leg_top;
-        pwm0_seq0.channel_1 = leg_init_values.leg_mid;
-        pwm0_seq0.channel_2 = leg_init_values.leg_bot;
+        pwm0_seq0.channel_0 = leg_init_values.leg_top | 0x8000;
+        pwm0_seq0.channel_1 = leg_init_values.leg_mid | 0x8000;
+        pwm0_seq0.channel_2 = leg_init_values.leg_bot | 0x8000;
         
-        pwm0_seq1.channel_0 = leg_init_values.leg_top;
-        pwm0_seq1.channel_1 = leg_init_values.leg_mid;
-        pwm0_seq1.channel_2 = leg_init_values.leg_bot;
+        pwm0_seq1.channel_0 = leg_init_values.leg_top | 0x8000;
+        pwm0_seq1.channel_1 = leg_init_values.leg_mid | 0x8000;
+        pwm0_seq1.channel_2 = leg_init_values.leg_bot | 0x8000;
     }
     
     //leg 1
     if(hexapod_get_next_seq_value(1, &leg_init_values) != -1)
     {
-        pwm1_seq0.channel_0 = leg_init_values.leg_top;
-        pwm1_seq0.channel_1 = leg_init_values.leg_mid;
-        pwm1_seq0.channel_2 = leg_init_values.leg_bot;
-        
-        pwm1_seq1.channel_0 = leg_init_values.leg_top;
-        pwm1_seq1.channel_1 = leg_init_values.leg_mid;
-        pwm1_seq1.channel_2 = leg_init_values.leg_bot;
+        pwm1_seq0.channel_0 = leg_init_values.leg_top | 0x8000;
+        pwm1_seq0.channel_1 = leg_init_values.leg_mid | 0x8000;
+        pwm1_seq0.channel_2 = leg_init_values.leg_bot | 0x8000;
+         
+        pwm1_seq1.channel_0 = leg_init_values.leg_top | 0x8000;
+        pwm1_seq1.channel_1 = leg_init_values.leg_mid | 0x8000;
+        pwm1_seq1.channel_2 = leg_init_values.leg_bot | 0x8000;
     }
     
     //leg 2
     if(hexapod_get_next_seq_value(2, &leg_init_values) != -1)
     {
-        pwm2_seq0.channel_0 = leg_init_values.leg_top;
-        pwm2_seq0.channel_1 = leg_init_values.leg_mid;
-        pwm2_seq0.channel_2 = leg_init_values.leg_bot;
+        pwm2_seq0.channel_0 = leg_init_values.leg_top | 0x8000;
+        pwm2_seq0.channel_1 = leg_init_values.leg_mid | 0x8000;
+        pwm2_seq0.channel_2 = leg_init_values.leg_bot | 0x8000;
         
-        pwm2_seq1.channel_0 = leg_init_values.leg_top;
-        pwm2_seq1.channel_1 = leg_init_values.leg_mid;
-        pwm2_seq1.channel_2 = leg_init_values.leg_bot;
+        pwm2_seq1.channel_0 = leg_init_values.leg_top | 0x8000;
+        pwm2_seq1.channel_1 = leg_init_values.leg_mid | 0x8000;
+        pwm2_seq1.channel_2 = leg_init_values.leg_bot | 0x8000;
     }
     
     //leg 3
     if(hexapod_get_next_seq_value(3, &leg_init_values) != -1)
     {
-        pwm0_seq0.channel_3 = leg_init_values.leg_top;
-        pwm1_seq0.channel_3 = leg_init_values.leg_mid;
-        pwm2_seq0.channel_3 = leg_init_values.leg_bot;
+        pwm0_seq0.channel_3 = leg_init_values.leg_top | 0x8000;
+        pwm1_seq0.channel_3 = leg_init_values.leg_mid | 0x8000;
+        pwm2_seq0.channel_3 = leg_init_values.leg_bot | 0x8000;
         
-        pwm0_seq1.channel_3 = leg_init_values.leg_top;
-        pwm1_seq1.channel_3 = leg_init_values.leg_mid;
-        pwm2_seq1.channel_3 = leg_init_values.leg_bot;
+        pwm0_seq1.channel_3 = leg_init_values.leg_top | 0x8000;
+        pwm1_seq1.channel_3 = leg_init_values.leg_mid | 0x8000;
+        pwm2_seq1.channel_3 = leg_init_values.leg_bot | 0x8000;
     }
     
     //leg 4
@@ -274,9 +280,9 @@ void hexapod_servo_pwm_start()
     
     NRF_EGU0->TASKS_TRIGGER[0] = 1;
     
-    NRF_PWM0->TASKS_SEQSTART[0];
-    NRF_PWM1->TASKS_SEQSTART[0];
-    NRF_PWM2->TASKS_SEQSTART[0];
+    NRF_PWM0->TASKS_SEQSTART[0] = 1;
+    NRF_PWM1->TASKS_SEQSTART[0] = 1;
+    NRF_PWM2->TASKS_SEQSTART[0] = 1;
 }
     
 void hexapod_servo_pwm_init(hexapod_leg_t leg_pins[6])
@@ -284,7 +290,7 @@ void hexapod_servo_pwm_init(hexapod_leg_t leg_pins[6])
     hexapod_leg_t hard_pwm_pins[] = {leg_pins[0], leg_pins[1], leg_pins[2], leg_pins[3]};
     hexapod_leg_t soft_pwm_pins[] = {leg_pins[4], leg_pins[5]};
     
-    hexapod_servo_hard_pwm_init(hard_pwm_pins);
+    //hexapod_servo_hard_pwm_init(hard_pwm_pins);
     hexapod_servo_soft_pwm_init(soft_pwm_pins);
     
     hexapod_servo_pwm_start();
@@ -295,16 +301,16 @@ void PWM0_IRQHandler(void)
     hexapod_leg_t leg0;
     hexapod_leg_t leg3;
     
-    if(NRF_PWM0->EVENTS_SEQEND[0])
+    if(NRF_PWM0->EVENTS_SEQEND[0] == 1)
     {
         NRF_PWM0->EVENTS_SEQEND[0] = 0;
         NRF_PWM0->LOOP = 0xFFFF;
 
         if(hexapod_get_next_seq_value(0, &leg0) != -1)
         {
-            pwm0_seq0.channel_0 = leg0.leg_top;
-            pwm0_seq0.channel_1 = leg0.leg_mid;
-            pwm0_seq0.channel_2 = leg0.leg_bot;
+            pwm0_seq0.channel_0 = leg0.leg_top | 0x8000;
+            pwm0_seq0.channel_1 = leg0.leg_mid | 0x8000;
+            pwm0_seq0.channel_2 = leg0.leg_bot | 0x8000;
         }
         else
         {
@@ -312,19 +318,19 @@ void PWM0_IRQHandler(void)
         }
         if(hexapod_get_next_seq_value(3, &leg3) != -1)
         {
-            pwm0_seq0.channel_3 = leg3.leg_top;
+            pwm0_seq0.channel_3 = leg3.leg_top | 0x8000;
         }
     }
-    if(NRF_PWM0->EVENTS_SEQEND[1])
+    if(NRF_PWM0->EVENTS_SEQEND[1] == 1)
     {
         NRF_PWM0->EVENTS_SEQEND[1] = 0;
         NRF_PWM0->LOOP = 0xFFFF;
 
         if(hexapod_get_next_seq_value(0, &leg0) != -1)
         {
-            pwm0_seq1.channel_0 = leg0.leg_top;
-            pwm0_seq1.channel_1 = leg0.leg_mid;
-            pwm0_seq1.channel_2 = leg0.leg_bot;
+            pwm0_seq1.channel_0 = leg0.leg_top | 0x8000;
+            pwm0_seq1.channel_1 = leg0.leg_mid | 0x8000;
+            pwm0_seq1.channel_2 = leg0.leg_bot | 0x8000;
         }
         else
         {
@@ -332,7 +338,7 @@ void PWM0_IRQHandler(void)
         }
         if(hexapod_get_next_seq_value(3, &leg3) != -1)
         {
-            pwm0_seq1.channel_3 = leg3.leg_top;
+            pwm0_seq1.channel_3 = leg3.leg_top | 0x8000;
         }
     }
 }
@@ -342,16 +348,16 @@ void PWM1_IRQHandler(void)
     hexapod_leg_t leg1;
     hexapod_leg_t leg3;
     
-    if(NRF_PWM1->EVENTS_SEQEND[0])
+    if(NRF_PWM1->EVENTS_SEQEND[0] == 1)
     {
         NRF_PWM1->EVENTS_SEQEND[0] = 0;
         NRF_PWM1->LOOP = 0xFFFF;
 
         if(hexapod_get_next_seq_value(1, &leg1) != -1)
         {
-            pwm1_seq0.channel_0 = leg1.leg_top;
-            pwm1_seq0.channel_1 = leg1.leg_mid;
-            pwm1_seq0.channel_2 = leg1.leg_bot;
+            pwm1_seq0.channel_0 = leg1.leg_top | 0x8000;
+            pwm1_seq0.channel_1 = leg1.leg_mid | 0x8000;
+            pwm1_seq0.channel_2 = leg1.leg_bot | 0x8000;
         }
         else
         {
@@ -359,19 +365,19 @@ void PWM1_IRQHandler(void)
         }
         if(hexapod_get_next_seq_value(3, &leg3) != -1)
         {
-            pwm1_seq0.channel_3 = leg3.leg_mid;
+            pwm1_seq0.channel_3 = leg3.leg_mid | 0x8000;
         }
     }
-    if(NRF_PWM1->EVENTS_SEQEND[1])
+    if(NRF_PWM1->EVENTS_SEQEND[1] == 1)
     {
         NRF_PWM1->EVENTS_SEQEND[1] = 0;
         NRF_PWM1->LOOP = 0xFFFF;
 
         if(hexapod_get_next_seq_value(1, &leg1) != -1)
         {
-            pwm1_seq1.channel_0 = leg1.leg_top;
-            pwm1_seq1.channel_1 = leg1.leg_mid;
-            pwm1_seq1.channel_2 = leg1.leg_bot;
+            pwm1_seq1.channel_0 = leg1.leg_top | 0x8000;
+            pwm1_seq1.channel_1 = leg1.leg_mid | 0x8000;
+            pwm1_seq1.channel_2 = leg1.leg_bot | 0x8000;
         }
         else
         {
@@ -379,7 +385,7 @@ void PWM1_IRQHandler(void)
         }
         if(hexapod_get_next_seq_value(3, &leg3) != -1)
         {
-            pwm1_seq1.channel_3 = leg3.leg_mid;
+            pwm1_seq1.channel_3 = leg3.leg_mid | 0x8000;
         }
     }
 }
@@ -389,16 +395,16 @@ void PWM2_IRQHandler(void)
     hexapod_leg_t leg2;
     hexapod_leg_t leg3;
     
-    if(NRF_PWM2->EVENTS_SEQEND[0])
+    if(NRF_PWM2->EVENTS_SEQEND[0] == 1)
     {
         NRF_PWM2->EVENTS_SEQEND[0] = 0;
         NRF_PWM2->LOOP = 0xFFFF;
 
         if(hexapod_get_next_seq_value(2, &leg2) != -1)
         {
-            pwm2_seq0.channel_0 = leg2.leg_top;
-            pwm2_seq0.channel_1 = leg2.leg_mid;
-            pwm2_seq0.channel_2 = leg2.leg_bot;
+            pwm2_seq0.channel_0 = leg2.leg_top | 0x8000;
+            pwm2_seq0.channel_1 = leg2.leg_mid | 0x8000;
+            pwm2_seq0.channel_2 = leg2.leg_bot | 0x8000;
         }
         else
         {
@@ -406,19 +412,19 @@ void PWM2_IRQHandler(void)
         }
         if(hexapod_get_next_seq_value(3, &leg3) != -1)
         {
-            pwm2_seq0.channel_3 = leg3.leg_bot;
+            pwm2_seq0.channel_3 = leg3.leg_bot | 0x8000;
         }
     }
-    if(NRF_PWM2->EVENTS_SEQEND[1])
+    if(NRF_PWM2->EVENTS_SEQEND[1] == 1)
     {
         NRF_PWM2->EVENTS_SEQEND[1] = 0;
         NRF_PWM2->LOOP = 0xFFFF;
 
         if(hexapod_get_next_seq_value(2, &leg2) != -1)
         {
-            pwm2_seq1.channel_0 = leg2.leg_top;
-            pwm2_seq1.channel_1 = leg2.leg_mid;
-            pwm2_seq1.channel_2 = leg2.leg_bot;
+            pwm2_seq1.channel_0 = leg2.leg_top | 0x8000;
+            pwm2_seq1.channel_1 = leg2.leg_mid | 0x8000;
+            pwm2_seq1.channel_2 = leg2.leg_bot | 0x8000;
         }
         else
         {
@@ -426,7 +432,7 @@ void PWM2_IRQHandler(void)
         }
         if(hexapod_get_next_seq_value(3, &leg3) != -1)
         {
-            pwm2_seq1.channel_3 = leg3.leg_bot;
+            pwm2_seq1.channel_3 = leg3.leg_bot | 0x8000;
         }
     }
 }
