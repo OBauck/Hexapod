@@ -7,6 +7,7 @@
 #include "app_util_platform.h"
 #include "pwm_driver.h"
 #include "hexapod.h"
+#include "nrf_delay.h"
 
 typedef struct
 {
@@ -106,8 +107,7 @@ void hexapod_servo_soft_pwm_init(hexapod_leg_t leg_pins[2])
                         (PPI_CHENSET_CH6_Enabled << PPI_CHENSET_CH6_Pos) |
                         (PPI_CHENSET_CH7_Enabled << PPI_CHENSET_CH7_Pos) |
                         (PPI_CHENSET_CH8_Enabled << PPI_CHENSET_CH8_Pos) |
-                        (PPI_CHENSET_CH9_Enabled << PPI_CHENSET_CH9_Pos) |
-                        (PPI_CHENSET_CH10_Enabled << PPI_CHENSET_CH10_Pos);
+                        (PPI_CHENSET_CH9_Enabled << PPI_CHENSET_CH9_Pos);
     
 }
 
@@ -272,16 +272,30 @@ void hexapod_servo_pwm_start()
         NRF_TIMER4->CC[3] = leg_init_values.leg_bot;
     }
     
-    //start timers at the same time using ppi
-    NRF_PPI->CH[10].TEP = (uint32_t)&NRF_TIMER4->TASKS_START;
-    NRF_PPI->CH[10].EEP = (uint32_t)&NRF_EGU0->EVENTS_TRIGGERED[0];
+    //Start timers and PWM with delay to limit current
 
-    NRF_PPI->FORK[10].TEP = (uint32_t)&NRF_TIMER3->TASKS_START;
+    NRF_TIMER4->TASKS_START = 1;
     
-    NRF_EGU0->TASKS_TRIGGER[0] = 1;
+    nrf_delay_ms(1000);
+    
+    //ppi to allow timer 3 to be in sync with timer 4
+    NRF_PPI->CH[10].TEP = (uint32_t)&NRF_TIMER3->TASKS_START;
+    NRF_PPI->CH[10].EEP = (uint32_t)&NRF_TIMER4->EVENTS_COMPARE[0];
+    NRF_PPI->CHENSET = (PPI_CHENSET_CH10_Enabled << PPI_CHENSET_CH10_Pos);
+    
+    while(NRF_TIMER4->EVENTS_COMPARE[0] == 0);
+    nrf_delay_ms(100);
+        
+    NRF_PPI->CHENCLR = (PPI_CHENCLR_CH10_Enabled << PPI_CHENCLR_CH10_Pos);
+    
+    nrf_delay_ms(1000);
     
     NRF_PWM0->TASKS_SEQSTART[0] = 1;
+    
+    nrf_delay_ms(1000);
     NRF_PWM1->TASKS_SEQSTART[0] = 1;
+    
+    nrf_delay_ms(1000);
     NRF_PWM2->TASKS_SEQSTART[0] = 1;
 }
     
@@ -319,6 +333,9 @@ void PWM0_IRQHandler(void)
         if(hexapod_get_next_seq_value(3, &leg3) != -1)
         {
             pwm0_seq0.channel_3 = leg3.leg_top | 0x8000;
+            pwm1_seq0.channel_3 = leg3.leg_mid | 0x8000;
+            pwm2_seq0.channel_3 = leg3.leg_bot | 0x8000;
+            
         }
     }
     if(NRF_PWM0->EVENTS_SEQEND[1] == 1)
@@ -339,6 +356,8 @@ void PWM0_IRQHandler(void)
         if(hexapod_get_next_seq_value(3, &leg3) != -1)
         {
             pwm0_seq1.channel_3 = leg3.leg_top | 0x8000;
+            pwm1_seq1.channel_3 = leg3.leg_mid | 0x8000;
+            pwm2_seq1.channel_3 = leg3.leg_bot | 0x8000;
         }
     }
 }
@@ -346,7 +365,6 @@ void PWM0_IRQHandler(void)
 void PWM1_IRQHandler(void)
 {
     hexapod_leg_t leg1;
-    hexapod_leg_t leg3;
     
     if(NRF_PWM1->EVENTS_SEQEND[0] == 1)
     {
@@ -362,10 +380,6 @@ void PWM1_IRQHandler(void)
         else
         {
             pwm1_seq0 = pwm1_seq1;  //or memcpy?
-        }
-        if(hexapod_get_next_seq_value(3, &leg3) != -1)
-        {
-            pwm1_seq0.channel_3 = leg3.leg_mid | 0x8000;
         }
     }
     if(NRF_PWM1->EVENTS_SEQEND[1] == 1)
@@ -383,17 +397,12 @@ void PWM1_IRQHandler(void)
         {
             pwm1_seq1 = pwm1_seq0;  //or memcpy?
         }
-        if(hexapod_get_next_seq_value(3, &leg3) != -1)
-        {
-            pwm1_seq1.channel_3 = leg3.leg_mid | 0x8000;
-        }
     }
 }
 
 void PWM2_IRQHandler(void)
 {
     hexapod_leg_t leg2;
-    hexapod_leg_t leg3;
     
     if(NRF_PWM2->EVENTS_SEQEND[0] == 1)
     {
@@ -410,10 +419,6 @@ void PWM2_IRQHandler(void)
         {
             pwm2_seq0 = pwm2_seq1;  //or memcpy?
         }
-        if(hexapod_get_next_seq_value(3, &leg3) != -1)
-        {
-            pwm2_seq0.channel_3 = leg3.leg_bot | 0x8000;
-        }
     }
     if(NRF_PWM2->EVENTS_SEQEND[1] == 1)
     {
@@ -429,10 +434,6 @@ void PWM2_IRQHandler(void)
         else
         {
             pwm2_seq1 = pwm2_seq0;  //or memcpy?
-        }
-        if(hexapod_get_next_seq_value(3, &leg3) != -1)
-        {
-            pwm2_seq1.channel_3 = leg3.leg_bot | 0x8000;
         }
     }
 }

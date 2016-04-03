@@ -82,7 +82,9 @@ static uint32_t m_speed = MIN_SPEED;
 
 //static hexapod_leg_t m_leg_seq[6][MAX_FRAMES];
 
-static hexapod_leg_t m_leg_seq[MAX_FRAMES*2];
+//static hexapod_leg_t m_leg_seq[MAX_FRAMES*2];
+static hexapod_leg_t m_leg_seq_right[MAX_FRAMES*2];
+static hexapod_leg_t m_leg_seq_left[MAX_FRAMES*2];
 
 static uint32_t m_seq_count[6] = {0, 0, 0, 0, 0, 0};
 static uint32_t m_frames = 0;
@@ -101,7 +103,9 @@ void hexapod_init()
     leg_pins[4] = (hexapod_leg_t){BACK_LEFT_TOP, BACK_LEFT_MID, BACK_LEFT_BOT};
     leg_pins[5] = (hexapod_leg_t){BACK_RIGHT_TOP, BACK_RIGHT_MID, BACK_RIGHT_BOT};
     
-    m_leg_seq[0] = DEF_POSE_LEG;
+    //m_leg_seq[0] = DEF_POSE_LEG;
+    m_leg_seq_right[0] = DEF_POSE_LEG;
+    m_leg_seq_left[0] = DEF_POSE_LEG;
     
    /* 
     m_leg_seq[0][0] = DEF_POSE_LEFT_LEG;
@@ -145,11 +149,13 @@ int32_t hexapod_get_next_seq_value(uint32_t leg_number, hexapod_leg_t *leg)
         if((leg_number % 2) == 0)
         {
             //left leg
-            *leg = hexapod_invert_leg(m_leg_seq[m_seq_count[leg_number]]);
+            //*leg = hexapod_invert_leg(m_leg_seq[m_seq_count[leg_number]]);
+            *leg = m_leg_seq_left[m_seq_count[leg_number]];
         }
         else
         {
-            *leg = m_leg_seq[m_seq_count[leg_number]];
+            //*leg = m_leg_seq[m_seq_count[leg_number]];
+            *leg = m_leg_seq_right[m_seq_count[leg_number]];
         }
         
         m_seq_count[leg_number]++;
@@ -190,42 +196,76 @@ void calculate_trajectory(hexapod_leg_t endpoint_front, hexapod_leg_t endpoint_b
     int32_t diff_mid = endpoint_front.leg_mid - current_point.leg_mid;
     int32_t diff_bot = endpoint_front.leg_bot - current_point.leg_bot;
     
-    //FORWARD MOVEMENT ONLY IMPLEMENTED
+    int32_t right_way_lift_height = 0;
+    int32_t left_way_lift_height = 0;
+    
+    switch(direction)
+    {
+        case FORWARD:
+            break;
+        case BACKWARD:
+            break;
+        case RIGHT:
+        case FORWARD_RIGHT:
+        case BACKWARD_RIGHT:
+            right_way_lift_height = LEG_LIFT_HEIGHT;
+            break;
+        case LEFT:
+        case FORWARD_LEFT:
+        case BACKWARD_LEFT:
+            left_way_lift_height = LEG_LIFT_HEIGHT;
+            break;
+    }
     
     //TOP SERVO
     for(int i = 0; i < frames; i++)
     {
-        m_leg_seq[i].leg_top = current_point.leg_top + diff_top/frames*i;
-        m_leg_seq[frames*2 - i - 1].leg_top = current_point.leg_top + diff_top/frames*(i+1);     
+        m_leg_seq_right[i].leg_top = current_point.leg_top + diff_top*i/frames;
+        m_leg_seq_right[frames*2 - i - 1].leg_top = current_point.leg_top + diff_top*(i+1)/frames;  
+
+        m_leg_seq_left[i].leg_top = 3000 - (endpoint_front.leg_top - diff_top*i/frames);        
+        m_leg_seq_left[frames*2 - i - 1].leg_top = 3000 - (endpoint_front.leg_top - diff_top*(i+1)/frames);
     }
     
     
     //MIDDLE SERVO
     for(int i = 0; i < frames/2; i++)
     {
-        m_leg_seq[i].leg_mid = current_point.leg_mid + (diff_mid+2*LEG_LIFT_HEIGHT)*i/frames;     //curr + (diff/2+height)*i/(frames/2)
-        m_leg_seq[frames*2 - i - 1].leg_mid = current_point.leg_mid + diff_mid*(i+1)/frames;
+        //first quarter
+        m_leg_seq_right[i].leg_mid = current_point.leg_mid + (diff_mid+2*LEG_LIFT_HEIGHT)*i/frames;     //curr + (diff/2+height)*i/(frames/2)
+        m_leg_seq_left[i].leg_mid = 3000 - (current_point.leg_mid + diff_mid*i/frames);
+        //forth quarter
+        m_leg_seq_right[frames*2 - i - 1].leg_mid = current_point.leg_mid + diff_mid*(i+1)/frames;
+        m_leg_seq_left[frames*2 - i - 1].leg_mid = 3000 - (current_point.leg_mid + (diff_mid + 2*LEG_LIFT_HEIGHT)*(i+1)/frames);
     }
     for(int i = 0; i < frames/2; i++)
     {
-        //static uint32_t temp;
-        //temp = current_point.leg_mid + (diff_mid/2 + LEG_LIFT_HEIGHT) + diff_mid*i/frames - 2*LEG_LIFT_HEIGHT*i/frames;
-        m_leg_seq[i + frames/2].leg_mid = current_point.leg_mid + (diff_mid/2 + LEG_LIFT_HEIGHT) + diff_mid*i/frames - 2*LEG_LIFT_HEIGHT*i/frames; //curr + (diff/2+height) + (diff-diff/2-height)*i/(frames/2)
-        m_leg_seq[frames * 3 / 2 - i - 1].leg_mid = current_point.leg_mid + diff_mid/2 + diff_mid*(i+1)/frames;
+        //second quarter
+        m_leg_seq_right[i + frames/2].leg_mid = current_point.leg_mid + (diff_mid/2 + LEG_LIFT_HEIGHT) + diff_mid*i/frames - 2*LEG_LIFT_HEIGHT*i/frames; //curr + (diff/2+height) + (diff-diff/2-height)*i/(frames/2)
+        m_leg_seq_left[i + frames/2].leg_mid = 3000 - (current_point.leg_mid + diff_mid/2 + diff_mid*i/frames);
+        //third quarter
+        m_leg_seq_right[frames * 3 / 2 - i - 1].leg_mid = current_point.leg_mid + diff_mid/2 + diff_mid*(i+1)/frames;
+        m_leg_seq_left[frames * 3 / 2 - i - 1].leg_mid = 3000 - (current_point.leg_mid + (diff_mid/2 + LEG_LIFT_HEIGHT) + diff_mid*(i+1)/frames - 2*LEG_LIFT_HEIGHT*(i+1)/frames);
     }
     
     //BOTTOM SERVO
     for(int i = 0; i < frames/2; i++)
     {
         //m_leg_seq[i].leg_bot = current_point.leg_bot + (diff_bot+2*LEG_LIFT_HEIGHT)*i/frames;     //curr + (diff/2+height)*i/(frames/2)
-        m_leg_seq[i].leg_bot = current_point.leg_bot + (diff_bot)*i/frames;
-        m_leg_seq[frames*2 - i - 1].leg_bot = current_point.leg_bot + diff_bot*(i+1)/frames;
+        m_leg_seq_right[i].leg_bot = current_point.leg_bot + (diff_bot)*i/frames;
+        m_leg_seq_left[i].leg_bot = 3000 - m_leg_seq_right[i].leg_bot;
+        
+        m_leg_seq_right[frames*2 - i - 1].leg_bot = current_point.leg_bot + diff_bot*(i+1)/frames;
+        m_leg_seq_left[frames*2 - i - 1].leg_bot = 3000 - m_leg_seq_right[frames*2 - i - 1].leg_bot;
     }
     for(int i = 0; i < frames/2; i++)
     {
         //m_leg_seq[i + frames/2].leg_bot = current_point.leg_bot + (diff_bot/2 + LEG_LIFT_HEIGHT) + diff_bot*i/frames - 2*LEG_LIFT_HEIGHT*i/frames; //curr + (diff/2+height) + (diff-diff/2-height)*i/(frames/2)
-        m_leg_seq[i + frames/2].leg_bot = current_point.leg_bot + (diff_bot/2) + diff_bot*i/frames;
-        m_leg_seq[frames * 3 / 2 - i - 1].leg_bot = current_point.leg_bot + diff_bot/2 + diff_bot*(i+1)/frames;
+        m_leg_seq_right[i + frames/2].leg_bot = current_point.leg_bot + (diff_bot/2) + diff_bot*i/frames;
+        m_leg_seq_left[i + frames/2].leg_bot = 3000 - m_leg_seq_right[i + frames/2].leg_bot;
+        
+        m_leg_seq_right[frames * 3 / 2 - i - 1].leg_bot = current_point.leg_bot + diff_bot/2 + diff_bot*(i+1)/frames;
+        m_leg_seq_left[frames * 3 / 2 - i - 1].leg_bot = 3000 - m_leg_seq_right[frames * 3 / 2 - i - 1].leg_bot;
     }
     
     m_frames = frames*2;
@@ -333,17 +373,17 @@ void hexapod_move_forward(uint8_t speed)
         m_seq_updated[i] = false;
     }
     
-    hexapod_leg_t endpoint_front = {1750, 1500, 1200};
-    hexapod_leg_t endpoint_back = {1250, 1500, 1200};
+    hexapod_leg_t endpoint_front = {1700, 1500, 1200};
+    hexapod_leg_t endpoint_back = {1300, 1500, 1200};
     
-    //uint32_t frames = (1750 - 1250) / speed;
-    //calculate_trajectory(endpoint_front, endpoint_back, FORWARD, frames);
+    uint32_t frames = (1700 - 1300) / speed;
+    calculate_trajectory(endpoint_front, endpoint_back, FORWARD, frames);
     
     hexapod_leg_t endpoint_right = {1500, 1700, 1700};
     hexapod_leg_t endpoint_left = {1500, 1500, 1200};
     
-    uint32_t frames = (1700 - 1200) / speed;
-    calculate_trajectory(endpoint_right, endpoint_left, RIGHT, frames);
+    //uint32_t frames = (1700 - 1200) / speed;
+    //calculate_trajectory(endpoint_right, endpoint_left, RIGHT, frames);
     
     /*
     SEGGER_RTT_printf(0, "Trajectory:\tTop\tMid\tBot\n");
@@ -361,9 +401,9 @@ void hexapod_move_forward(uint8_t speed)
     m_seq_count[4] = 0;
     
     //group 2
-    m_seq_count[1] = frames;
-    m_seq_count[2] = frames;
-    m_seq_count[5] = frames;
+    m_seq_count[1] = 0;
+    m_seq_count[2] = 0;
+    m_seq_count[5] = 0;
     
     for(int i = 0; i < 6; i++)
     {
