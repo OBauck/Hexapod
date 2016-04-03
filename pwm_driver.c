@@ -150,7 +150,7 @@ void hard_pwm_setup(NRF_PWM_Type *pwm_reg, uint32_t pins[4])
     pwm_reg->PRESCALER   = (PWM_PRESCALER_PRESCALER_DIV_16 << PWM_PRESCALER_PRESCALER_Pos);
     
     pwm_reg->COUNTERTOP  = (20000 << PWM_COUNTERTOP_COUNTERTOP_Pos);
-    //pwm_reg->LOOP        = 0xFFFF;
+    pwm_reg->LOOP        = 0xFFFF;
     pwm_reg->SEQ[0].REFRESH  = 0;
     pwm_reg->SEQ[0].ENDDELAY = 0;
     
@@ -290,7 +290,7 @@ void hexapod_servo_pwm_init(hexapod_leg_t leg_pins[6])
     hexapod_leg_t hard_pwm_pins[] = {leg_pins[0], leg_pins[1], leg_pins[2], leg_pins[3]};
     hexapod_leg_t soft_pwm_pins[] = {leg_pins[4], leg_pins[5]};
     
-    //hexapod_servo_hard_pwm_init(hard_pwm_pins);
+    hexapod_servo_hard_pwm_init(hard_pwm_pins);
     hexapod_servo_soft_pwm_init(soft_pwm_pins);
     
     hexapod_servo_pwm_start();
