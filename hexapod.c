@@ -14,8 +14,8 @@
 
 #define LEG_DEFAULT_VALUE 1500
 
-//#define DEF_POSE_LEFT_LEG (hexapod_leg_t){LEG_DEFAULT_VALUE, LEG_DEFAULT_VALUE, LEG_DEFAULT_VALUE}
-//#define DEF_POSE_RIGHT_LEG (hexapod_leg_t){LEG_DEFAULT_VALUE, LEG_DEFAULT_VALUE, LEG_DEFAULT_VALUE}
+#define DEF_POSE_LEFT_LEG (hexapod_leg_t){LEG_DEFAULT_VALUE, LEG_DEFAULT_VALUE, 1800}
+#define DEF_POSE_RIGHT_LEG (hexapod_leg_t){LEG_DEFAULT_VALUE, LEG_DEFAULT_VALUE, 1200}
 
 #define DEF_POSE_LEG (hexapod_leg_t){LEG_DEFAULT_VALUE, LEG_DEFAULT_VALUE, 1200}
 
@@ -104,8 +104,8 @@ void hexapod_init()
     leg_pins[5] = (hexapod_leg_t){BACK_RIGHT_TOP, BACK_RIGHT_MID, BACK_RIGHT_BOT};
     
     //m_leg_seq[0] = DEF_POSE_LEG;
-    m_leg_seq_right[0] = DEF_POSE_LEG;
-    m_leg_seq_left[0] = DEF_POSE_LEG;
+    m_leg_seq_right[0] = DEF_POSE_RIGHT_LEG;
+    m_leg_seq_left[0] = DEF_POSE_LEFT_LEG;
     
    /* 
     m_leg_seq[0][0] = DEF_POSE_LEFT_LEG;
@@ -395,14 +395,17 @@ void hexapod_move_forward(uint8_t speed)
     SEGGER_RTT_printf(0, "\n");
     */
     
+    //if group 1 and right leg -> start at frames
+    //if group 2 and left leg ->start at frames
+    
     //group 1
     m_seq_count[0] = 0;
-    m_seq_count[3] = 0;
+    m_seq_count[3] = frames;
     m_seq_count[4] = 0;
     
     //group 2
     m_seq_count[1] = 0;
-    m_seq_count[2] = 0;
+    m_seq_count[2] = frames;
     m_seq_count[5] = 0;
     
     for(int i = 0; i < 6; i++)
