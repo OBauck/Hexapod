@@ -132,11 +132,26 @@ static void gap_params_init(void)
 /**@snippet [Handling the data received over BLE] */
 static void nus_data_handler(ble_nus_t * p_nus, uint8_t * p_data, uint16_t length)
 {
-    for (uint32_t i = 0; i < length; i++)
+    if(strncmp("forward", (char *)p_data, length) == 0)
     {
-        while(app_uart_put(p_data[i]) != NRF_SUCCESS);
+        //forward movement
     }
-    while(app_uart_put('\n') != NRF_SUCCESS);
+    if(strncmp("backward", (char *)p_data, length) == 0)
+    {
+        //backward movement
+    }
+    if(strncmp("right", (char *)p_data, length) == 0)
+    {
+        //right movement
+    }
+    if(strncmp("left", (char *)p_data, length) == 0)
+    {
+        //left movement
+    }
+    if(strncmp("stop", (char *)p_data, length) == 0)
+    {
+        //stop movement
+    }
 }
 /**@snippet [Handling the data received over BLE] */
 
@@ -401,10 +416,10 @@ int main(void)
 
     err_code = ble_advertising_start(BLE_ADV_MODE_FAST);
     APP_ERROR_CHECK(err_code);
-    
-    */
-  
+   */ 
     hexapod_init();
+    
+    hexapod_move_forward(5);
     
     // Enter main loop.
     for (;;)
