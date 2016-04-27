@@ -419,7 +419,10 @@ int main(void)
    */ 
     hexapod_init();
     
-    hexapod_move_forward(5);
+    hexapod_move_forward(10);
+    //hexapod_move_right(10);
+    //hexapod_move_diagonal(10);
+    //hexapod_turn_clockwise(10);
     
     // Enter main loop.
     for (;;)
