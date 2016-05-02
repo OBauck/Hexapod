@@ -288,14 +288,10 @@ void hexapod_servo_pwm_start()
         
     NRF_PPI->CHENCLR = (PPI_CHENCLR_CH10_Enabled << PPI_CHENCLR_CH10_Pos);
     
-    nrf_delay_ms(1000);
-    
     NRF_PWM0->TASKS_SEQSTART[0] = 1;
-    
-    nrf_delay_ms(1000);
+
     NRF_PWM1->TASKS_SEQSTART[0] = 1;
-    
-    nrf_delay_ms(1000);
+
     NRF_PWM2->TASKS_SEQSTART[0] = 1;
 }
     

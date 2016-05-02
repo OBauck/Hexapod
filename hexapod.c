@@ -5,7 +5,7 @@
 #include "nrf.h"
 #include "hexapod.h"
 #include "pwm_driver.h"
-#include "segger_rtt.h"
+#include "nrf_log.h"
 #include "nrf_delay.h"
 
 #define MAX_SPEED 100 //movements per cycle (1000)
@@ -66,6 +66,7 @@ typedef enum
     BACKWARD_LEFT,
     CW_TURN,
     CCW_TURN,
+    STOP,
 } hexapod_dir_t;
 
 /*
@@ -84,7 +85,6 @@ static uint32_t m_speed = MIN_SPEED;
 
 //static hexapod_leg_t m_leg_seq[6][MAX_FRAMES];
 
-//static hexapod_leg_t m_leg_seq[MAX_FRAMES*2];
 static hexapod_leg_t m_leg_seq_right[MAX_FRAMES*2];
 static hexapod_leg_t m_leg_seq_left[MAX_FRAMES*2];
 
@@ -93,6 +93,9 @@ static uint32_t m_frames = 0;
 static bool m_seq_updated[6] = {false, false, false, false, false, false};
 
 static bool m_lift_group1 = false;
+static bool m_repeat_seq = true;
+static bool m_change_direction = false;
+static hexapod_dir_t m_direction = STOP;
 
 void hexapod_init()
 {
@@ -105,18 +108,9 @@ void hexapod_init()
     leg_pins[4] = (hexapod_leg_t){BACK_LEFT_TOP, BACK_LEFT_MID, BACK_LEFT_BOT};
     leg_pins[5] = (hexapod_leg_t){BACK_RIGHT_TOP, BACK_RIGHT_MID, BACK_RIGHT_BOT};
     
-    //m_leg_seq[0] = DEF_POSE_LEG;
     m_leg_seq_right[0] = DEF_POSE_RIGHT_LEG;
     m_leg_seq_left[0] = DEF_POSE_LEFT_LEG;
     
-   /* 
-    m_leg_seq[0][0] = DEF_POSE_LEFT_LEG;
-    m_leg_seq[1][0] = DEF_POSE_RIGHT_LEG;
-    m_leg_seq[2][0] = DEF_POSE_LEFT_LEG;
-    m_leg_seq[3][0] = DEF_POSE_RIGHT_LEG;
-    m_leg_seq[4][0] = DEF_POSE_LEFT_LEG;
-    m_leg_seq[5][0] = DEF_POSE_RIGHT_LEG;
-    */
     for(int i = 0; i < 6; i++)
     {
         m_seq_count[i] = 0;
@@ -127,17 +121,10 @@ void hexapod_init()
     hexapod_servo_pwm_init(leg_pins);
 }
 
-
-hexapod_leg_t hexapod_invert_leg(hexapod_leg_t leg)
+void change_direction(hexapod_dir_t direction)
 {
-    hexapod_leg_t inverted_leg;
-    
-    //leg value = (1500 - leg value) + 1500
-    inverted_leg.leg_top = 3000 - leg.leg_top;
-    inverted_leg.leg_mid = 3000 - leg.leg_mid;
-    inverted_leg.leg_bot = 3000 - leg.leg_bot;
-    
-    return inverted_leg;
+    m_direction = direction;
+    m_change_direction = true;
 }
 
 int32_t hexapod_get_next_seq_value(uint32_t leg_number, hexapod_leg_t *leg)
@@ -146,17 +133,44 @@ int32_t hexapod_get_next_seq_value(uint32_t leg_number, hexapod_leg_t *leg)
     {
         if(m_seq_count[leg_number] == m_frames)
         {
-            m_seq_count[leg_number] = 0;
+            //stop if sequence should not be repeated
+            if(m_repeat_seq == false)
+            {
+                for(int i = 0; i < 6; i++)
+                {
+                    m_seq_updated[i] = false;
+                }
+                
+                if(m_change_direction == true)
+                {
+                    
+                    
+                    m_change_direction = false;
+                }
+                
+                return -1;
+            }
+            
+            //TODO: do calculating of new trajectory in main with app_scheduler
+            
+            //check if new trajectory should be calculated
+            if(m_change_direction == true)
+            {
+                 
+            }
+            else
+            {
+                m_seq_count[leg_number] = 0;
+            }
         }
         if((leg_number % 2) == 0)
         {
             //left leg
-            //*leg = hexapod_invert_leg(m_leg_seq[m_seq_count[leg_number]]);
             *leg = m_leg_seq_left[m_seq_count[leg_number]];
         }
         else
         {
-            //*leg = m_leg_seq[m_seq_count[leg_number]];
+            //right leg
             *leg = m_leg_seq_right[m_seq_count[leg_number]];
         }
         
@@ -288,6 +302,18 @@ void calculate_trajectory(hexapod_leg_t endpoint_front, hexapod_leg_t endpoint_b
     
 }
 
+void print_directory()
+{
+    NRF_LOG_PRINTF("directory:\nRight leg\t\t\tLeft leg\nT\tM\tB\t\tT\tM\tB\t\n");
+    for(int i = 0; i < m_frames; i++)
+    {
+        NRF_LOG_PRINTF("%d\t%d\t%d\t\t%d\t%d\t%d\t\n", 
+        m_leg_seq_right[i].leg_top, m_leg_seq_right[i].leg_mid, m_leg_seq_right[i].leg_bot,
+        m_leg_seq_left[i].leg_top, m_leg_seq_left[i].leg_mid, m_leg_seq_left[i].leg_bot);
+        nrf_delay_ms(10);
+    }
+}
+
 void hexapod_move_forward(uint8_t speed)
 {
     for(int i = 0; i < 6; i++)
@@ -313,6 +339,8 @@ void hexapod_move_forward(uint8_t speed)
     m_seq_count[1] = 0;
     m_seq_count[2] = frames;
     m_seq_count[5] = 0;
+    
+    //print_directory();
     
     for(int i = 0; i < 6; i++)
     {
@@ -342,6 +370,8 @@ void hexapod_move_right(uint8_t speed)
     m_seq_count[1] = 0;
     m_seq_count[2] = frames;
     m_seq_count[5] = 0;
+    
+    //print_directory();
     
     for(int i = 0; i < 6; i++)
     {
@@ -410,9 +440,62 @@ void hexapod_turn_clockwise(uint8_t speed)
     }
 }
 
-void hexapod_stop()
+void calculate_change_trajectory(hexapod_dir_t last_dir, hexapod_dir_t new_dir)
 {
+    hexapod_leg_t endpoint_1;
+    hexapod_leg_t endpoint_2;
     
+    switch(last_dir)
+    {
+        case FORWARD:
+        case BACKWARD:
+            endpoint_1 = (hexapod_leg_t){1700, 1500, 1200};
+            break;
+        case RIGHT:
+        case LEFT:
+            endpoint_1 = (hexapod_leg_t){1500, 1700, 1700};
+            break;
+        case FORWARD_RIGHT:
+        case BACKWARD_RIGHT:
+            //not implemented yet
+            break;
+        case FORWARD_LEFT:
+        case BACKWARD_LEFT:
+            //not implemented yet
+            break;
+        case CW_TURN:
+        case CCW_TURN:
+            //not implemented yet
+            break;
+        case STOP:
+            break;
+    }
+    
+    switch(new_dir)
+    {
+        case FORWARD:
+        case BACKWARD:
+            endpoint_2 = (hexapod_leg_t){1300, 1500, 1200};
+            break;
+        case RIGHT:
+        case LEFT:
+            endpoint_2 = (hexapod_leg_t){1500, 1500, 1200};
+            break;
+        case FORWARD_RIGHT:
+        case BACKWARD_RIGHT:
+            //not implemented yet
+            break;
+        case FORWARD_LEFT:
+        case BACKWARD_LEFT:
+            //not implemented yet
+            break;
+        case CW_TURN:
+        case CCW_TURN:
+            //not implemented yet
+            break;
+        case STOP:
+            break;
+    }
 }
 
 void hexapod_move(uint8_t x, uint8_t y)

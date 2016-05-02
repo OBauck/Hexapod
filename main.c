@@ -404,6 +404,11 @@ static void power_manage(void)
 int main(void)
 {
     uint32_t err_code;
+    
+    err_code = NRF_LOG_INIT();
+    APP_ERROR_CHECK(err_code);
+
+    NRF_LOG_PRINTF("Start...\n");
 /*
     // Initialize.
     APP_TIMER_INIT(APP_TIMER_PRESCALER, APP_TIMER_OP_QUEUE_SIZE, false);
@@ -420,9 +425,9 @@ int main(void)
     hexapod_init();
     
     hexapod_move_forward(10);
-    //hexapod_move_right(10);
-    //hexapod_move_diagonal(10);
-    //hexapod_turn_clockwise(10);
+    
+    //hexapod_move_diagonal(20);
+    //hexapod_turn_clockwise(20);
     
     // Enter main loop.
     for (;;)
