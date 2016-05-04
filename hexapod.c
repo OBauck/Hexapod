@@ -19,6 +19,8 @@
 
 #define DEF_POSE_LEG (hexapod_leg_t){LEG_DEFAULT_VALUE, LEG_DEFAULT_VALUE, 1200}
 
+#define NUMBER_OF_LEGS  6
+
 //#define LEG_LIFT_HEIGHT_LEFT 50
 //#define LEG_LIFT_HEIGHT_RIGHT -50
 
@@ -89,13 +91,23 @@ static hexapod_leg_t m_leg_seq_right[MAX_FRAMES*2];
 static hexapod_leg_t m_leg_seq_left[MAX_FRAMES*2];
 
 static uint32_t m_seq_count[6] = {0, 0, 0, 0, 0, 0};
-static uint32_t m_frames = 0;
+static int32_t m_frames = 0;
 static bool m_seq_updated[6] = {false, false, false, false, false, false};
 
 static bool m_lift_group1 = false;
 static bool m_repeat_seq = true;
 static bool m_change_direction = false;
 static hexapod_dir_t m_direction = STOP;
+
+////////////////
+static int32_t m_count[6];
+static bool direction[6];
+static hexapod_leg_t m_current_point[6];
+static hexapod_leg_t m_endpoint_out_left;
+static hexapod_leg_t m_endpoint_out_right;
+static hexapod_leg_t m_endpoint_in_left;
+static hexapod_leg_t m_endpoint_in_right;
+static uint32_t m_endpoint_reached = 6;
 
 void hexapod_init()
 {
@@ -108,25 +120,198 @@ void hexapod_init()
     leg_pins[4] = (hexapod_leg_t){BACK_LEFT_TOP, BACK_LEFT_MID, BACK_LEFT_BOT};
     leg_pins[5] = (hexapod_leg_t){BACK_RIGHT_TOP, BACK_RIGHT_MID, BACK_RIGHT_BOT};
     
+    /*
     m_leg_seq_right[0] = DEF_POSE_RIGHT_LEG;
     m_leg_seq_left[0] = DEF_POSE_LEFT_LEG;
-    
+
     for(int i = 0; i < 6; i++)
     {
         m_seq_count[i] = 0;
         m_seq_updated[i] = true;
     }
     m_frames = 1;
+    */
     
+    /*
+    m_current_point[0] = DEF_POSE_LEFT_LEG;
+    m_current_point[1] = DEF_POSE_RIGHT_LEG;
+    m_current_point[2] = DEF_POSE_LEFT_LEG;
+    m_current_point[3] = DEF_POSE_RIGHT_LEG;
+    m_current_point[4] = DEF_POSE_LEFT_LEG;
+    m_current_point[5] = DEF_POSE_RIGHT_LEG;
+    
+    m_endpoint_out_left = DEF_POSE_LEFT_LEG;
+    m_endpoint_out_right = DEF_POSE_RIGHT_LEG;
+    m_endpoint_in_left = DEF_POSE_LEFT_LEG;
+    m_endpoint_in_right = DEF_POSE_RIGHT_LEG;
+    */
     hexapod_servo_pwm_init(leg_pins);
 }
+
+
+
+void calculate_endpoints(uint32_t dir_x, uint32_t dir_y, uint32_t rot_x)
+{
+    
+}
+
+void calc_next_points_leg(uint32_t leg_nr)
+{
+    
+    int32_t leg_lift_height = 0;
+    int32_t point_lift_height = 0;
+    hexapod_leg_t endpoint_1;
+    hexapod_leg_t endpoint_2;
+    
+    if(direction[leg_nr] == true)
+    {
+        //check if left leg
+        if((leg_nr % 2) == 0)
+        {
+            endpoint_1 = m_endpoint_in_left;
+            endpoint_2 = m_endpoint_out_left;
+            leg_lift_height = -LEG_LIFT_HEIGHT;
+        }
+        else
+        {
+            endpoint_1 = m_endpoint_in_right;
+            endpoint_2 = m_endpoint_out_right;
+            leg_lift_height = LEG_LIFT_HEIGHT;
+        }
+    }
+    else
+    {
+        //check if left leg
+        if((leg_nr % 2) == 0)
+        {
+            endpoint_1 = m_endpoint_out_left;
+            endpoint_2 = m_endpoint_in_left;
+        }
+        else
+        {
+            endpoint_1 = m_endpoint_out_right;
+            endpoint_2 = m_endpoint_in_right;
+        }
+    }
+    
+    //going from endpoint_1 to endpoint_2
+            
+    //top leg
+    m_current_point[leg_nr].leg_top = endpoint_1.leg_top + (endpoint_2.leg_top - endpoint_1.leg_top) * m_count[leg_nr] / m_frames;
+    
+    //mid leg
+    //calculate lift height
+    if(leg_lift_height != 0)
+    {
+        if(m_count[leg_nr] < m_frames/2)
+        {
+            point_lift_height = 2 * m_count[leg_nr] * leg_lift_height / m_frames;
+        }
+        else
+        {
+            point_lift_height = leg_lift_height - (2 * m_count[leg_nr] - m_frames) * leg_lift_height / m_frames;
+        }
+    }
+    
+    m_current_point[leg_nr].leg_mid = (int32_t)(endpoint_1.leg_mid + (endpoint_2.leg_mid - endpoint_1.leg_mid) * m_count[leg_nr] / m_frames) + point_lift_height;
+    
+    //bottom leg
+    m_current_point[leg_nr].leg_bot = endpoint_1.leg_bot + (endpoint_2.leg_bot - endpoint_1.leg_bot) * m_count[leg_nr] / m_frames;
+    
+    //increase count value
+    m_count[leg_nr]++;
+}
+
+void calc_next_points()
+{
+    //TODO: include flag to block updating PWM if values are not updated
+    
+    for(int i = 0; i < 6; i++)
+    {
+        calc_next_points_leg(i);
+    }
+}
+
+int32_t hexapod_get_next_seq_value(uint32_t leg_nr, hexapod_leg_t *leg)
+{    
+    
+    *leg = m_current_point[leg_nr];
+    calc_next_points_leg(leg_nr);
+    
+    if(m_count[leg_nr] == m_frames)
+    {
+        //we are at a enpoint
+        //change direction
+        direction[leg_nr] = !direction[leg_nr];
+        
+        //TODO: update to new direction
+        /*
+        m_endpoint_reached++;
+        
+        if(m_endpoint_reached == NUMBER_OF_LEGS)
+        {
+            //all endpoint reached, update endpoints
+            m_endpoint_reached = 0;
+        }
+        */
+        m_count[leg_nr] = 0;
+    }
+    return 0;
+}
+
+void print_trajectory(uint32_t leg_nr)
+{
+    hexapod_leg_t leg;
+    NRF_LOG_PRINTF("directory:\nleg number: %d\nT\tM\tB\n", leg_nr);
+    for(int i = 0; i < m_frames; i++)
+    {
+        hexapod_get_next_seq_value(leg_nr, &leg);
+        NRF_LOG_PRINTF("%d\t%d\t%d\n", 
+        leg.leg_top, leg.leg_mid, leg.leg_bot);
+        nrf_delay_ms(10);
+    }
+}
+
+void hexapod_move_forward2(uint8_t speed)
+{
+    
+    m_frames = (1700 - 1300) / speed;
+    m_endpoint_out_right.leg_top = 1700;
+    m_endpoint_out_right.leg_mid = 1500;
+    m_endpoint_out_right.leg_bot = 1200;
+    
+    m_endpoint_in_right.leg_top = 1300;
+    m_endpoint_in_right.leg_mid = 1500;
+    m_endpoint_in_right.leg_bot = 1200;
+    
+    m_endpoint_out_left.leg_top = 1300;
+    m_endpoint_out_left.leg_mid = 1500;
+    m_endpoint_out_left.leg_bot = 1800;
+    
+    m_endpoint_in_left.leg_top = 1700;
+    m_endpoint_in_left.leg_mid = 1500;
+    m_endpoint_in_left.leg_bot = 1800;
+    
+    direction[0] = false;
+    direction[1] = true;
+    direction[2] = true;
+    direction[3] = false;
+    direction[4] = true;
+    direction[5] = false;
+    
+    //print_trajectory(0);
+}
+
+
+
+///old using sequence:
 
 void change_direction(hexapod_dir_t direction)
 {
     m_direction = direction;
     m_change_direction = true;
 }
-
+/*
 int32_t hexapod_get_next_seq_value(uint32_t leg_number, hexapod_leg_t *leg)
 {
     if(m_seq_updated[leg_number])
@@ -179,7 +364,7 @@ int32_t hexapod_get_next_seq_value(uint32_t leg_number, hexapod_leg_t *leg)
     }
     return -1;
 }
-
+*/
 int32_t abs_int32(int32_t value)
 {
     if(value < 0)

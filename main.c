@@ -422,9 +422,12 @@ int main(void)
     err_code = ble_advertising_start(BLE_ADV_MODE_FAST);
     APP_ERROR_CHECK(err_code);
    */ 
+    
+    hexapod_move_forward2(10);
+    
     hexapod_init();
     
-    hexapod_move_forward(10);
+    
     
     //hexapod_move_diagonal(20);
     //hexapod_turn_clockwise(20);
