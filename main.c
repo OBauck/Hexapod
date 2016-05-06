@@ -423,10 +423,9 @@ int main(void)
     APP_ERROR_CHECK(err_code);
    */ 
     
-    hexapod_move_forward2(10);
-    
     hexapod_init();
     
+    hexapod_move_forward2(10);
     
     
     //hexapod_move_diagonal(20);
