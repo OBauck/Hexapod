@@ -82,7 +82,7 @@ Group 1 is leg 0, 3 and 4
 Group 2 is leg 1, 2 and 5 
 
 */
-
+/*
 static uint32_t m_speed = MIN_SPEED;
 
 //static hexapod_leg_t m_leg_seq[6][MAX_FRAMES];
@@ -91,29 +91,53 @@ static hexapod_leg_t m_leg_seq_right[MAX_FRAMES*2];
 static hexapod_leg_t m_leg_seq_left[MAX_FRAMES*2];
 
 static uint32_t m_seq_count[6] = {0, 0, 0, 0, 0, 0};
-static int32_t m_frames = 0;
 static bool m_seq_updated[6] = {false, false, false, false, false, false};
 
 static bool m_lift_group1 = false;
 static bool m_repeat_seq = true;
 static bool m_change_direction = false;
 static hexapod_dir_t m_direction = STOP;
-
+*/
 ////////////////
-static int32_t m_count[6] = {0, 0, 0, 0, 0, 0};
-static bool direction[6];
-static bool new_direction[6];
-static hexapod_leg_t m_current_point[6];
-static uint32_t m_endpoint_reached = 6;
-static bool is_moving = false;
 
-//TODO change this with state variables and state machine
 typedef enum
 {
     IDLE,
     TRANSITION,
     NEW_ENDPOINTS,
 } hexapod_state_t;
+
+typedef struct
+{
+    hexapod_leg_t current_point;
+    hexapod_leg_t endpoint_out;
+    hexapod_leg_t endpoint_in;
+    hexapod_leg_t new_endpoint_out;
+    hexapod_leg_t new_endpoint_in;
+    hexapod_state_t state;
+    int32_t count;
+    int32_t frames;
+    bool direction;
+    bool is_moving;
+    bool stop;
+    bool is_left_leg;
+} hexapod_leg_data_t;
+
+hexapod_leg_data_t leg_data[6];
+
+static int32_t new_frames = 0;
+static int32_t transition_frames = 0;
+
+/*
+static int32_t m_frames = 0;
+static int32_t m_new_frames = 0;
+static int32_t m_count[6] = {0, 0, 0, 0, 0, 0};
+static bool direction[6] = {false, true, true, false, false, true};
+static bool new_direction[6];
+static hexapod_leg_t m_current_point[6];
+static uint32_t m_endpoint_reached = 6;
+volatile bool is_moving = false;
+volatile bool stop = false;
 
 hexapod_state_t m_state = IDLE;
 //static bool new_endpoints = false;
@@ -128,7 +152,7 @@ static hexapod_leg_t m_new_endpoint_out_left;
 static hexapod_leg_t m_new_endpoint_out_right;
 static hexapod_leg_t m_new_endpoint_in_left;
 static hexapod_leg_t m_new_endpoint_in_right;
-
+*/
 
 
 void hexapod_init()
@@ -154,19 +178,54 @@ void hexapod_init()
     m_frames = 1;
     */
     
-    
+    /*
     m_current_point[0] = DEF_POSE_LEFT_LEG;
     m_current_point[1] = DEF_POSE_RIGHT_LEG;
     m_current_point[2] = DEF_POSE_LEFT_LEG;
     m_current_point[3] = DEF_POSE_RIGHT_LEG;
     m_current_point[4] = DEF_POSE_LEFT_LEG;
     m_current_point[5] = DEF_POSE_RIGHT_LEG;
+    */
     
+    for(int i = 0; i < NUMBER_OF_LEGS; i++)
+    {
+        if( i % 2 == 0)
+        {
+            leg_data[i].current_point = DEF_POSE_LEFT_LEG;
+            leg_data[i].endpoint_out = DEF_POSE_LEFT_LEG;
+            leg_data[i].endpoint_in = DEF_POSE_LEFT_LEG;
+            leg_data[i].is_left_leg = true;
+        }
+        else
+        {
+            leg_data[i].current_point = DEF_POSE_RIGHT_LEG;
+            leg_data[i].endpoint_out = DEF_POSE_RIGHT_LEG;
+            leg_data[i].endpoint_in = DEF_POSE_RIGHT_LEG;
+            leg_data[i].is_left_leg = false;
+        }
+        
+        //check which group
+        if( (i == 0) || (i == 3) || (i == 4) )
+        {
+            leg_data[i].direction = false;
+        }
+        else
+        {
+            leg_data[i].direction = true;
+        }
+        
+        leg_data[i].count = 0;
+        leg_data[i].frames = 0;
+        leg_data[i].is_moving = false;
+        leg_data[i].state = IDLE;
+        leg_data[i].stop = false;
+    }
+    /*
     m_endpoint_out_left = DEF_POSE_LEFT_LEG;
     m_endpoint_out_right = DEF_POSE_RIGHT_LEG;
     m_endpoint_in_left = DEF_POSE_LEFT_LEG;
     m_endpoint_in_right = DEF_POSE_RIGHT_LEG;
-    
+    */
     hexapod_servo_pwm_init(leg_pins);
 }
 
@@ -184,92 +243,78 @@ void calc_next_points_leg(uint32_t leg_nr)
     int32_t point_lift_height = 0;
     hexapod_leg_t endpoint_1;
     hexapod_leg_t endpoint_2;
+    hexapod_leg_data_t *p_leg_data;
     
-    if(direction[leg_nr] == true)
+    p_leg_data = &leg_data[leg_nr];
+    
+    //we can't divide by 0
+    if(p_leg_data->frames == 0)
     {
-        //check if left leg
-        if((leg_nr % 2) == 0)
+        return;
+    }
+    
+    if(p_leg_data->direction == true)
+    {
+        endpoint_1 = p_leg_data->endpoint_in;
+        if(p_leg_data->state == NEW_ENDPOINTS)
         {
-            endpoint_1 = m_endpoint_in_left;
-            if(m_state == TRANSITION)
-            {
-                endpoint_2 = m_new_endpoint_out_left;
-            }
-            else
-            {
-                endpoint_2 = m_endpoint_out_left;
-            }
+            endpoint_2 = p_leg_data->new_endpoint_out;
+        }
+        else
+        {
+            endpoint_2 = p_leg_data->endpoint_out;
+        }
+        
+        //lift leg if left leg
+        if(p_leg_data->is_left_leg)
+        {
             leg_lift_height = -LEG_LIFT_HEIGHT;
         }
         else
         {
-            endpoint_1 = m_endpoint_in_right;
-            if(m_state == TRANSITION)
-            {
-                endpoint_2 = m_new_endpoint_out_right;
-            }
-            else
-            {
-                endpoint_2 = m_endpoint_out_right;
-            }
             leg_lift_height = LEG_LIFT_HEIGHT;
         }
     }
     else
     {
-        //check if left leg
-        if((leg_nr % 2) == 0)
+        endpoint_1 = p_leg_data->endpoint_out;
+        if(p_leg_data->state == NEW_ENDPOINTS)
         {
-            endpoint_1 = m_endpoint_out_left;
-            if(m_state == TRANSITION)
-            {
-                endpoint_2 = m_new_endpoint_in_left;
-            }
-            else
-            {
-                endpoint_2 = m_endpoint_in_left;
-            }
+            endpoint_2 = p_leg_data->new_endpoint_in;
         }
         else
         {
-            endpoint_1 = m_endpoint_out_right;
-            if(m_state == TRANSITION)
-            {
-                endpoint_2 = m_new_endpoint_in_right;
-            }
-            else
-            {
-                endpoint_2 = m_endpoint_in_right;
-            }
+            endpoint_2 = p_leg_data->endpoint_in;
         }
     }
     
     //going from endpoint_1 to endpoint_2
             
     //top leg
-    m_current_point[leg_nr].leg_top = endpoint_1.leg_top + (endpoint_2.leg_top - endpoint_1.leg_top) * m_count[leg_nr] / m_frames;
+    p_leg_data->current_point.leg_top = endpoint_1.leg_top + (endpoint_2.leg_top - endpoint_1.leg_top) * p_leg_data->count / p_leg_data->frames;
     
     //mid leg
     //calculate lift height
     if(leg_lift_height != 0)
     {
-        if(m_count[leg_nr] < m_frames/2)
+        if(p_leg_data->count < p_leg_data->frames/2)
         {
-            point_lift_height = 2 * m_count[leg_nr] * leg_lift_height / m_frames;
+            point_lift_height = 2 * p_leg_data->count * leg_lift_height / p_leg_data->frames;
         }
         else
         {
-            point_lift_height = leg_lift_height - (2 * m_count[leg_nr] - m_frames) * leg_lift_height / m_frames;
+            point_lift_height = leg_lift_height - (2 * p_leg_data->count - p_leg_data->frames) * leg_lift_height / p_leg_data->frames;
         }
     }
     
-    m_current_point[leg_nr].leg_mid = endpoint_1.leg_mid + (endpoint_2.leg_mid - endpoint_1.leg_mid) * m_count[leg_nr] / m_frames + point_lift_height;
+    p_leg_data->current_point.leg_mid = endpoint_1.leg_mid + (endpoint_2.leg_mid - endpoint_1.leg_mid) * p_leg_data->count / p_leg_data->frames + point_lift_height;
     
     //bottom leg
-    m_current_point[leg_nr].leg_bot = endpoint_1.leg_bot + (endpoint_2.leg_bot - endpoint_1.leg_bot) * m_count[leg_nr] / m_frames;
+    p_leg_data->current_point.leg_bot = endpoint_1.leg_bot + (endpoint_2.leg_bot - endpoint_1.leg_bot) * p_leg_data->count / p_leg_data->frames;
     
     //increase count value
-    m_count[leg_nr]++;
+    p_leg_data->count++;
+    
 }
 
 void calc_next_points()
@@ -284,56 +329,58 @@ void calc_next_points()
 
 int32_t hexapod_get_next_seq_value(uint32_t leg_nr, hexapod_leg_t *leg)
 {    
-    if(is_moving == false)
+
+    hexapod_leg_data_t *p_leg_data;
+    
+    p_leg_data = &leg_data[leg_nr];
+    *leg = p_leg_data->current_point;
+    
+    if(leg_nr == 1)
     {
-        return -1;
+        NRF_LOG_PRINTF("%d, %d: %d\t%d\t%d\n", p_leg_data->count, p_leg_data->frames, leg->leg_top, leg->leg_mid, leg->leg_bot);
     }
     
-    *leg = m_current_point[leg_nr];
-    calc_next_points_leg(leg_nr);
-    /*
-    if(leg_nr == 4)
+    if(p_leg_data->is_moving == false)
     {
-        NRF_LOG_PRINTF("%d\t%d\t%d\n", leg->leg_top, leg->leg_mid, leg->leg_bot);
-        NRF_LOG_PRINTF("Count: %d\n", m_count[leg_nr]);
+        return 0;
     }
-    */
-    if(m_count[leg_nr] >= m_frames)
+    
+    calc_next_points_leg(leg_nr);
+    
+    if(p_leg_data->count >= p_leg_data->frames)
     {
         //we are at a enpoint
         
         //change direction
-        direction[leg_nr] = !direction[leg_nr];
+        p_leg_data->direction = !p_leg_data->direction;
         
-        switch(m_state)
+        switch(p_leg_data->state)
         {
             case IDLE:
                 break;
             case TRANSITION:
-                m_state = NEW_ENDPOINTS;
+                p_leg_data->state = NEW_ENDPOINTS;
+                p_leg_data->frames = transition_frames;
                 break;
             case NEW_ENDPOINTS:
-                
-                //CHANGE THIS
-                m_frames = 400;
+
+                p_leg_data->endpoint_in = p_leg_data->new_endpoint_in;
+                p_leg_data->endpoint_out = p_leg_data->new_endpoint_out;
             
-                m_endpoint_out_left = m_new_endpoint_out_left;
-                m_endpoint_out_right = m_new_endpoint_out_right;
-                m_endpoint_in_left = m_new_endpoint_in_left;
-                m_endpoint_in_right = m_new_endpoint_in_right;
-                
-                for(int i = 0; i < NUMBER_OF_LEGS; i++)
+                if(p_leg_data->stop == true)
                 {
-                    direction[i] = new_direction[i];
+                    p_leg_data->is_moving = false;
                 }
-                m_state = IDLE;
+                
+                p_leg_data->state = IDLE;
+                p_leg_data->frames = new_frames;
                 break;
             default:
                 //ERROR!
                 break;
         }
 
-        m_count[leg_nr] = 0;
+        p_leg_data->count = 0;
     }
     return 0;
 }
@@ -341,11 +388,14 @@ int32_t hexapod_get_next_seq_value(uint32_t leg_nr, hexapod_leg_t *leg)
 void print_trajectory(uint32_t leg_nr)
 {
     hexapod_leg_t leg;
-    NRF_LOG_PRINTF("directory:\nleg number: %d\nT\tM\tB\n", leg_nr);
-    for(int i = 0; i < m_frames; i++)
+    //NRF_LOG_PRINTF("endpoint_left_out: %d\t%d\t%d\n", m_count[leg_nr],
+      //  leg.leg_top, leg.leg_mid, leg.leg_bot);
+    NRF_LOG_PRINTF("m_frames: %d\n", leg_data[leg_nr].frames);
+    NRF_LOG_PRINTF("trajectory leg number: %d\nT\t\tM\t\tB\n", leg_nr);
+    for(int i = 0; i < leg_data[leg_nr].frames; i++)
     {
         hexapod_get_next_seq_value(leg_nr, &leg);
-        NRF_LOG_PRINTF("%d\t%d\t%d\n", 
+        NRF_LOG_PRINTF("%d: %d\t%d\t%d\n", leg_data[leg_nr].count,
         leg.leg_top, leg.leg_mid, leg.leg_bot);
         nrf_delay_ms(10);
     }
@@ -359,7 +409,7 @@ int32_t abs_int32(int32_t value)
     }
     return value;
 }
-
+/*
 void calculate_frames()
 {
     uint32_t max;
@@ -379,12 +429,53 @@ void calculate_frames()
         }
         
 }
+*/
 
-void hexapod_move_forward2(uint8_t speed)
+void hexapod_move_forward(uint8_t speed)
 {
     
-    //CHANGE THIS!
-    m_frames = 200 / speed;
+    //TODO: NEED TO CHECK IF LEG IS ALREADY IN TRANSITION
+    //TODO: NEED TO CALCULATE FRAMES
+    
+    hexapod_leg_data_t *p_leg_data;
+    
+    hexapod_leg_t endpoint_front_right = {1700, 1500, 1200};
+    hexapod_leg_t endpoint_back_right = {1300, 1500, 1200};
+    hexapod_leg_t endpoint_front_left = {1300, 1500, 1800};
+    hexapod_leg_t endpoint_back_left = {1700, 1500, 1800};
+    
+    transition_frames = 200/speed;
+    new_frames = 400/speed;
+    
+    for( int i = 0; i < NUMBER_OF_LEGS; i++)
+    {
+        p_leg_data = &leg_data[i];
+        
+        if(p_leg_data->is_left_leg)
+        {
+            p_leg_data->new_endpoint_in = endpoint_back_left;
+            p_leg_data->new_endpoint_out = endpoint_front_left;
+        }
+        else
+        {
+            p_leg_data->new_endpoint_in = endpoint_back_right;
+            p_leg_data->new_endpoint_out = endpoint_front_right;
+        }
+        
+        p_leg_data->stop = false;
+        p_leg_data->is_moving = true;
+        p_leg_data->state = TRANSITION;
+    }
+    
+    /*
+    if(is_moving == false)
+    {
+        m_new_frames = 200 / speed;
+    }
+    else
+    {
+        m_new_frames = 400 / speed;
+    }
     
     m_new_endpoint_out_right.leg_top = 1700;
     m_new_endpoint_out_right.leg_mid = 1500;
@@ -401,36 +492,91 @@ void hexapod_move_forward2(uint8_t speed)
     m_new_endpoint_in_left.leg_top = 1700;
     m_new_endpoint_in_left.leg_mid = 1500;
     m_new_endpoint_in_left.leg_bot = 1800;
+
+    m_state = TRANSITION;
+    stop = false;
+    is_moving = true;
+    */
+
+    /*
+    print_trajectory(1);
+    print_trajectory(1);
+    print_trajectory(1);
+    */
     
-    
-    
-    new_direction[0] = false;
-    new_direction[1] = true;
-    new_direction[2] = true;
-    new_direction[3] = false;
-    new_direction[4] = false;
-    new_direction[5] = true;
-    
-    for(int i = 0; i < NUMBER_OF_LEGS; i++)
+}
+/*
+
+void hexapod_move_right(uint8_t speed)
+{
+    //change this
+    if(is_moving == false)
     {
-        m_count[i] = 0;
+        m_new_frames = 200 / speed;
+    }
+    else
+    {
+        m_new_frames = 500 / speed;
     }
     
-    is_moving = true;
+    //CHANGE THIS!
+    m_frames = 200 / speed;
     
-    //print_trajectory(0);
+    m_new_endpoint_out_right.leg_top = 1500;
+    m_new_endpoint_out_right.leg_mid = 1700;
+    m_new_endpoint_out_right.leg_bot = 1700;
+    
+    m_new_endpoint_in_right.leg_top = 1500;
+    m_new_endpoint_in_right.leg_mid = 1500;
+    m_new_endpoint_in_right.leg_bot = 1200;
+    
+    m_new_endpoint_out_left.leg_top = 1500;
+    m_new_endpoint_out_left.leg_mid = 1300;
+    m_new_endpoint_out_left.leg_bot = 1300;
+    
+    m_new_endpoint_in_left.leg_top = 1500;
+    m_new_endpoint_in_left.leg_mid = 1500;
+    m_new_endpoint_in_left.leg_bot = 1800;
+
+    m_state = TRANSITION;
+    stop = false;
+    is_moving = true;
+
+    print_trajectory(1);
+    print_trajectory(1);
+    print_trajectory(1);
 }
 
+void hexapod_stop(uint8_t speed)
+{
+    //change this
 
+    m_new_frames = 200 / speed;
+    
+    m_new_endpoint_out_right = DEF_POSE_RIGHT_LEG;
+    m_new_endpoint_in_right = DEF_POSE_RIGHT_LEG;
+    
+    m_new_endpoint_out_left = DEF_POSE_LEFT_LEG;
+    m_new_endpoint_in_left = DEF_POSE_LEFT_LEG;
 
-///old using sequence:
+    stop = true;
+    is_moving = true;
+    m_state = TRANSITION;
 
+    print_trajectory(1);
+    print_trajectory(1);
+    print_trajectory(1);
+}
+*/
+
+///OLD CODE USING SEQUENCE:
+/*
 void change_direction(hexapod_dir_t direction)
 {
     m_direction = direction;
     m_change_direction = true;
 }
-/*
+
 int32_t hexapod_get_next_seq_value(uint32_t leg_number, hexapod_leg_t *leg)
 {
     if(m_seq_updated[leg_number])
@@ -483,7 +629,7 @@ int32_t hexapod_get_next_seq_value(uint32_t leg_number, hexapod_leg_t *leg)
     }
     return -1;
 }
-*/
+
 
 
 uint32_t max(uint32_t value1, uint32_t value2, uint32_t value3)
@@ -795,11 +941,5 @@ void calculate_change_trajectory(hexapod_dir_t last_dir, hexapod_dir_t new_dir)
     }
 }
 
-void hexapod_move(uint8_t x, uint8_t y)
-{
-    uint8_t speed = sqrt(x*x + y*y);
-    
-    
-    
-}
+*/
 

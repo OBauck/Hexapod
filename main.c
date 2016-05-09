@@ -38,6 +38,7 @@
 #include "bsp.h"
 #include "bsp_btn_ble.h"
 #include "hexapod.h"
+#include "nrf_delay.h"
 
 
 #define IS_SRVC_CHANGED_CHARACT_PRESENT 0                                           /**< Include the service_changed characteristic. If not enabled, the server's database cannot be changed for the lifetime of the device. */
@@ -408,7 +409,9 @@ int main(void)
     err_code = NRF_LOG_INIT();
     APP_ERROR_CHECK(err_code);
 
-    NRF_LOG_PRINTF("Start...\n");
+    //clear RTT screen
+    NRF_LOG("\033[2J\033[H");
+    NRF_LOG("\n\n<<<<<<<<< START >>>>>>>>>>\n\n");
 /*
     // Initialize.
     APP_TIMER_INIT(APP_TIMER_PRESCALER, APP_TIMER_OP_QUEUE_SIZE, false);
@@ -425,9 +428,23 @@ int main(void)
     
     hexapod_init();
     
-    hexapod_move_forward2(10);
+    nrf_delay_ms(1000);
     
+    NRF_LOG("\nFORWARD\n\n");
+    hexapod_move_forward(5);
     
+    nrf_delay_ms(1000);
+    /*
+    NRF_LOG("\nRIGHT\n\n");
+    hexapod_move_right(20);
+    
+    nrf_delay_ms(1000);
+    
+    NRF_LOG("\STOP\n\n");
+    hexapod_stop(20);
+    
+    nrf_delay_ms(1000);
+    */
     //hexapod_move_diagonal(20);
     //hexapod_turn_clockwise(20);
     
