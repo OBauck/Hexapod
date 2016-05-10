@@ -39,14 +39,20 @@
 #include "bsp_btn_ble.h"
 #include "hexapod.h"
 #include "nrf_delay.h"
+#include "app_scheduler.h"
+#include "nrf_drv_saadc.h"
 
+
+// Scheduler settings
+#define SCHED_MAX_EVENT_DATA_SIZE       4
+#define SCHED_QUEUE_SIZE                10
 
 #define IS_SRVC_CHANGED_CHARACT_PRESENT 0                                           /**< Include the service_changed characteristic. If not enabled, the server's database cannot be changed for the lifetime of the device. */
 
 #define CENTRAL_LINK_COUNT              0                                           /**< Number of central links used by the application. When changing this number remember to adjust the RAM settings*/
 #define PERIPHERAL_LINK_COUNT           1                                           /**< Number of peripheral links used by the application. When changing this number remember to adjust the RAM settings*/
 
-#define DEVICE_NAME                     "Nordic_UART"                               /**< Name of device. Will be included in the advertising data. */
+#define DEVICE_NAME                     "Nordic_BUG"                               /**< Name of device. Will be included in the advertising data. */
 #define NUS_SERVICE_UUID_TYPE           BLE_UUID_TYPE_VENDOR_BEGIN                  /**< UUID type for the Nordic UART Service (vendor specific). */
 
 #define APP_ADV_INTERVAL                64                                          /**< The advertising interval (in units of 0.625 ms. This value corresponds to 40 ms). */
@@ -59,14 +65,31 @@
 #define MAX_CONN_INTERVAL               MSEC_TO_UNITS(75, UNIT_1_25_MS)             /**< Maximum acceptable connection interval (75 ms), Connection interval uses 1.25 ms units. */
 #define SLAVE_LATENCY                   0                                           /**< Slave latency. */
 #define CONN_SUP_TIMEOUT                MSEC_TO_UNITS(4000, UNIT_10_MS)             /**< Connection supervisory timeout (4 seconds), Supervision Timeout uses 10 ms units. */
-#define FIRST_CONN_PARAMS_UPDATE_DELAY  APP_TIMER_TICKS(5000, APP_TIMER_PRESCALER)  /**< Time from initiating event (connect or start of notification) to first time sd_ble_gap_conn_param_update is called (5 seconds). */
-#define NEXT_CONN_PARAMS_UPDATE_DELAY   APP_TIMER_TICKS(30000, APP_TIMER_PRESCALER) /**< Time between each call to sd_ble_gap_conn_param_update after the first call (30 seconds). */
+#define FIRST_CONN_PARAMS_UPDATE_DELAY  APP_TIMER_TICKS(1000, APP_TIMER_PRESCALER)  /**< Time from initiating event (connect or start of notification) to first time sd_ble_gap_conn_param_update is called (5 seconds). */
+#define NEXT_CONN_PARAMS_UPDATE_DELAY   APP_TIMER_TICKS(5000, APP_TIMER_PRESCALER) /**< Time between each call to sd_ble_gap_conn_param_update after the first call (30 seconds). */
 #define MAX_CONN_PARAMS_UPDATE_COUNT    3                                           /**< Number of attempts before giving up the connection parameter negotiation. */
 
 #define DEAD_BEEF                       0xDEADBEEF                                  /**< Value used as error code on stack dump, can be used to identify stack location on stack unwind. */
 
 #define UART_TX_BUF_SIZE                256                                         /**< UART TX buffer size. */
 #define UART_RX_BUF_SIZE                256                                         /**< UART RX buffer size. */
+
+//ADC
+#define BATTERY_LEVEL_MEAS_INTERVAL         APP_TIMER_TICKS(1000, APP_TIMER_PRESCALER) /**< Battery level measurement interval (ticks). This value corresponds to 1 second. */
+
+#define ADC_REF_VOLTAGE_IN_MILLIVOLTS       600                                          /**< Reference voltage (in milli volts) used by ADC while doing conversion. */
+#define ADC_PRE_SCALING_COMPENSATION        6                                            /**< The ADC is configured to use VDD with 1/3 prescaling as input. And hence the result of conversion is to be multiplied by 3 to get the actual value of the battery voltage.*/
+#define DIODE_FWD_VOLT_DROP_MILLIVOLTS      270                                          /**< Typical forward voltage drop of the diode (Part no: SD103ATW-7-F) that is connected in series with the voltage supply. This is the voltage drop when the forward current is 1mA. Source: Data sheet of 'SURFACE MOUNT SCHOTTKY BARRIER DIODE ARRAY' available at www.diodes.com. */
+#define REGULATOR_FWD_VOLT_DROP_MILLIVOLTS  300                                         /**< See AP7333 datasheet       */     
+
+#define ADC_INPUT_PRESCALER                 3                                            /**< Input prescaler for ADC convestion on NRF51. */
+#define ADC_RES_10BIT                       1024                                         /**< Maximum digital value for 10-bit ADC conversion. */
+
+#define ADC_RESULT_IN_MILLI_VOLTS(ADC_VALUE)\
+        ((((ADC_VALUE) * ADC_REF_VOLTAGE_IN_MILLIVOLTS) / ADC_RES_10BIT) * ADC_PRE_SCALING_COMPENSATION)
+        
+static nrf_saadc_value_t adc_buf[2];
+APP_TIMER_DEF(m_battery_timer_id);                                               /**< Battery measurement timer. */
 
 static ble_nus_t                        m_nus;                                      /**< Structure to identify the Nordic UART Service. */
 static uint16_t                         m_conn_handle = BLE_CONN_HANDLE_INVALID;    /**< Handle of the current connection. */
@@ -88,6 +111,118 @@ static ble_uuid_t                       m_adv_uuids[] = {{BLE_UUID_NUS_SERVICE, 
 void assert_nrf_callback(uint16_t line_num, const uint8_t * p_file_name)
 {
     app_error_handler(DEAD_BEEF, line_num, p_file_name);
+}
+
+/**@brief Function for handling the ADC interrupt.
+ *
+ * @details  This function will fetch the conversion result from the ADC, convert the value into
+ *           percentage and send it to peer.
+ */
+void saadc_event_handler(nrf_drv_saadc_evt_t const * p_event)
+{
+    if (p_event->type == NRF_DRV_SAADC_EVT_DONE)
+    {
+        nrf_saadc_value_t adc_result;
+        uint16_t          batt_lvl_in_milli_volts;
+        //uint8_t           percentage_batt_lvl;
+        uint32_t          err_code;
+
+        adc_result = p_event->data.done.p_buffer[0];
+
+        err_code = nrf_drv_saadc_buffer_convert(p_event->data.done.p_buffer, 1);
+        APP_ERROR_CHECK(err_code);
+
+        //The battery voltage will be at least this value
+        //TODO find out if regulator dropout voltage is needed (datasheet says about 0V on low current consumption)
+        batt_lvl_in_milli_volts = ADC_RESULT_IN_MILLI_VOLTS(adc_result);
+        
+        //NRF_LOG_PRINTF("Battery voltage: %d\n", batt_lvl_in_milli_volts);
+        
+        //if battery voltage is below 3.2V we shut down the servos
+        //TODO: implement a low pass filter to avoid drops in voltage leading to shutdown
+        
+        if(batt_lvl_in_milli_volts < 3200)
+        {
+            //hexapod_shutdown();
+        }
+        
+        //Bas is not supported yet
+        /*
+        percentage_batt_lvl = battery_level_in_percent(batt_lvl_in_milli_volts);
+
+        err_code = ble_bas_battery_level_update(&m_bas, percentage_batt_lvl);
+        if (
+            (err_code != NRF_SUCCESS)
+            &&
+            (err_code != NRF_ERROR_INVALID_STATE)
+            &&
+            (err_code != BLE_ERROR_NO_TX_PACKETS)
+            &&
+            (err_code != BLE_ERROR_GATTS_SYS_ATTR_MISSING)
+           )
+        {
+            APP_ERROR_HANDLER(err_code);
+        }
+        */
+        
+        nrf_drv_saadc_uninit();
+        NRF_SAADC->INTENCLR = (SAADC_INTENCLR_END_Clear << SAADC_INTENCLR_END_Pos);
+        NVIC_ClearPendingIRQ(SAADC_IRQn);
+    }
+}
+
+/**@brief Function for configuring ADC to do battery level conversion.
+ */
+static void adc_configure(void)
+{
+    ret_code_t err_code = nrf_drv_saadc_init(NULL, saadc_event_handler);
+    APP_ERROR_CHECK(err_code);
+
+    nrf_saadc_channel_config_t config = NRF_DRV_SAADC_DEFAULT_CHANNEL_CONFIG_SE(NRF_SAADC_INPUT_VDD);
+    err_code = nrf_drv_saadc_channel_init(0,&config);
+    APP_ERROR_CHECK(err_code);
+
+    err_code = nrf_drv_saadc_buffer_convert(&adc_buf[0], 1);
+    APP_ERROR_CHECK(err_code);
+
+    err_code = nrf_drv_saadc_buffer_convert(&adc_buf[1], 1);
+    APP_ERROR_CHECK(err_code);
+}
+
+static void battery_level_meas_timeout_handler(void * p_context)
+{
+    UNUSED_PARAMETER(p_context);
+
+    uint32_t err_code;
+    adc_configure();
+    err_code = nrf_drv_saadc_sample();
+    APP_ERROR_CHECK(err_code);
+}
+
+/**@brief Function for the Timer initialization.
+ *
+ * @details Initializes the timer module. This creates and starts application timers.
+ */
+static void timers_init(void)
+{
+    uint32_t err_code;
+
+    // Initialize timer module.
+    APP_TIMER_INIT(APP_TIMER_PRESCALER, APP_TIMER_OP_QUEUE_SIZE, false);
+
+    // Create battery timer.
+    err_code = app_timer_create(&m_battery_timer_id,
+                                APP_TIMER_MODE_REPEATED,
+                                battery_level_meas_timeout_handler);
+    APP_ERROR_CHECK(err_code);
+}
+
+static void application_timers_start(void)
+{
+    uint32_t err_code;
+    
+    err_code = app_timer_start(m_battery_timer_id, BATTERY_LEVEL_MEAS_INTERVAL, NULL);
+    APP_ERROR_CHECK(err_code);
 }
 
 
@@ -120,6 +255,7 @@ static void gap_params_init(void)
     APP_ERROR_CHECK(err_code);
 }
 
+static uint8_t m_speed = 20;
 
 /**@brief Function for handling the data from the Nordic UART Service.
  *
@@ -133,24 +269,51 @@ static void gap_params_init(void)
 /**@snippet [Handling the data received over BLE] */
 static void nus_data_handler(ble_nus_t * p_nus, uint8_t * p_data, uint16_t length)
 {
+    //TODO: use app_scheduler instead to move the calculation to main context
+    
     if(strncmp("forward", (char *)p_data, length) == 0)
     {
         //forward movement
+        hexapod_move_forward(true, m_speed);
     }
     if(strncmp("backward", (char *)p_data, length) == 0)
     {
         //backward movement
+        hexapod_move_forward(false, m_speed);
     }
     if(strncmp("right", (char *)p_data, length) == 0)
     {
         //right movement
+        hexapod_move_sideways(true, m_speed);
     }
     if(strncmp("left", (char *)p_data, length) == 0)
     {
         //left movement
+        hexapod_move_sideways(false, m_speed);
+    }
+    if(strncmp("rotate_cw", (char *)p_data, length) == 0)
+    {
+        //rotate clockwise
+        hexapod_turn(true, m_speed);
+    }
+    if(strncmp("rotate_ccw", (char *)p_data, length) == 0)
+    {
+        //rotate counter clockwise
+        hexapod_turn(false, m_speed);
+    }
+    if(strncmp("diagonal_right", (char *)p_data, length) == 0)
+    {
+        hexapod_move_diagonal(true, m_speed);
+        //diagonal forward right movement
+    }
+    if(strncmp("diagonal_left", (char *)p_data, length) == 0)
+    {
+        hexapod_move_diagonal(false, m_speed);
+        //diagonal forward left movement
     }
     if(strncmp("stop", (char *)p_data, length) == 0)
     {
+        hexapod_stop(m_speed);
         //stop movement
     }
 }
@@ -410,48 +573,34 @@ int main(void)
     APP_ERROR_CHECK(err_code);
 
     //clear RTT screen
-    NRF_LOG("\033[2J\033[H");
+    NRF_LOG("\033[2J\033[;H");
     NRF_LOG("\n\n<<<<<<<<< START >>>>>>>>>>\n\n");
-/*
+
     // Initialize.
-    APP_TIMER_INIT(APP_TIMER_PRESCALER, APP_TIMER_OP_QUEUE_SIZE, false);
+    timers_init();
+    APP_SCHED_INIT(SCHED_MAX_EVENT_DATA_SIZE, SCHED_QUEUE_SIZE);
     
     ble_stack_init();
+    
+    //sd_power_dcdc_mode_set(NRF_POWER_DCDC_ENABLE);
+    
     gap_params_init();
     services_init();
     advertising_init();
     conn_params_init();
 
+    application_timers_start();
     err_code = ble_advertising_start(BLE_ADV_MODE_FAST);
     APP_ERROR_CHECK(err_code);
-   */ 
-    
+
     hexapod_init();
     
-    nrf_delay_ms(1000);
-    
-    NRF_LOG("\nFORWARD\n\n");
-    hexapod_move_forward(5);
-    
-    nrf_delay_ms(1000);
-    /*
-    NRF_LOG("\nRIGHT\n\n");
-    hexapod_move_right(20);
-    
-    nrf_delay_ms(1000);
-    
-    NRF_LOG("\STOP\n\n");
-    hexapod_stop(20);
-    
-    nrf_delay_ms(1000);
-    */
-    //hexapod_move_diagonal(20);
-    //hexapod_turn_clockwise(20);
     
     // Enter main loop.
     for (;;)
     {
-        //power_manage();
+        app_sched_execute();
+        power_manage();
     }
 }
 

@@ -294,6 +294,16 @@ void hexapod_servo_pwm_start()
 
     NRF_PWM2->TASKS_SEQSTART[0] = 1;
 }
+
+void hexapod_servo_pwm_stop()
+{
+    NRF_PWM0->TASKS_STOP = 1;
+    NRF_PWM1->TASKS_STOP = 1;
+    NRF_PWM2->TASKS_STOP = 1;
+    
+    NRF_TIMER3->TASKS_STOP = 1;
+    NRF_TIMER4->TASKS_STOP = 1;
+}
     
 void hexapod_servo_pwm_init(hexapod_leg_t leg_pins[6])
 {

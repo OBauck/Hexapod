@@ -13,23 +13,26 @@
 #define MAX_FRAMES 100
 
 #define LEG_DEFAULT_VALUE 1500
+#define LEG_HEIGHT_OFFSET  100
 
-#define DEF_POSE_LEFT_LEG (hexapod_leg_t){LEG_DEFAULT_VALUE, LEG_DEFAULT_VALUE, 1800}
-#define DEF_POSE_RIGHT_LEG (hexapod_leg_t){LEG_DEFAULT_VALUE, LEG_DEFAULT_VALUE, 1200}
+#define TOP_LEG_DEFAULT_VALUE 1500
+#define TOP_LEG_MAX_VALUE 1700
+#define TOP_LEG_MIN_VALUE 1300
 
-#define DEF_POSE_LEG (hexapod_leg_t){LEG_DEFAULT_VALUE, LEG_DEFAULT_VALUE, 1200}
+#define MID_LEG_DEFAULT_VALUE (1500 + LEG_HEIGHT_OFFSET)
+#define MID_LEG_MAX_VALUE (1700 + LEG_HEIGHT_OFFSET)
+#define MID_LEG_MIN_VALUE (1500 + LEG_HEIGHT_OFFSET)
+
+#define BOT_LEG_DEFAULT_VALUE (1200 + LEG_HEIGHT_OFFSET)
+#define BOT_LEG_MAX_VALUE (1700 + LEG_HEIGHT_OFFSET)
+#define BOT_LEG_MIN_VALUE (1200 + LEG_HEIGHT_OFFSET)
+
+#define DEF_POSE_LEFT_LEG (hexapod_leg_t){3000 - TOP_LEG_DEFAULT_VALUE, 3000 - MID_LEG_DEFAULT_VALUE, 3000 - BOT_LEG_DEFAULT_VALUE}
+#define DEF_POSE_RIGHT_LEG (hexapod_leg_t){TOP_LEG_DEFAULT_VALUE, MID_LEG_DEFAULT_VALUE, BOT_LEG_DEFAULT_VALUE}
 
 #define NUMBER_OF_LEGS  6
 
-//#define LEG_LIFT_HEIGHT_LEFT 50
-//#define LEG_LIFT_HEIGHT_RIGHT -50
-
-#define LEG_LIFT_HEIGHT -200
-
-#define MAX_FORWARD_VALUE    1750
-#define MIN_FORWARD_VALUE   1250
-#define MAX_SIDEWAYS_VALUE   1750
-#define MIN_SIDEWAYS_VALUE   1250
+#define LEG_LIFT_HEIGHT -300
 
 //pin definitions
 #define FRONT_LEFT_BOT      5
@@ -56,21 +59,6 @@
 #define BACK_RIGHT_MID      15
 #define BACK_RIGHT_TOP      14
 
-typedef enum
-{
-    FORWARD,
-    FORWARD_RIGHT,
-    FORWARD_LEFT,
-    RIGHT,
-    LEFT,
-    BACKWARD,
-    BACKWARD_RIGHT,
-    BACKWARD_LEFT,
-    CW_TURN,
-    CCW_TURN,
-    STOP,
-} hexapod_dir_t;
-
 /*
 For writability legs are numbered 0-5 from front left to bottom right
 
@@ -82,22 +70,7 @@ Group 1 is leg 0, 3 and 4
 Group 2 is leg 1, 2 and 5 
 
 */
-/*
-static uint32_t m_speed = MIN_SPEED;
 
-//static hexapod_leg_t m_leg_seq[6][MAX_FRAMES];
-
-static hexapod_leg_t m_leg_seq_right[MAX_FRAMES*2];
-static hexapod_leg_t m_leg_seq_left[MAX_FRAMES*2];
-
-static uint32_t m_seq_count[6] = {0, 0, 0, 0, 0, 0};
-static bool m_seq_updated[6] = {false, false, false, false, false, false};
-
-static bool m_lift_group1 = false;
-static bool m_repeat_seq = true;
-static bool m_change_direction = false;
-static hexapod_dir_t m_direction = STOP;
-*/
 ////////////////
 
 typedef enum
@@ -166,26 +139,6 @@ void hexapod_init()
     leg_pins[4] = (hexapod_leg_t){BACK_LEFT_TOP, BACK_LEFT_MID, BACK_LEFT_BOT};
     leg_pins[5] = (hexapod_leg_t){BACK_RIGHT_TOP, BACK_RIGHT_MID, BACK_RIGHT_BOT};
     
-    /*
-    m_leg_seq_right[0] = DEF_POSE_RIGHT_LEG;
-    m_leg_seq_left[0] = DEF_POSE_LEFT_LEG;
-
-    for(int i = 0; i < 6; i++)
-    {
-        m_seq_count[i] = 0;
-        m_seq_updated[i] = true;
-    }
-    m_frames = 1;
-    */
-    
-    /*
-    m_current_point[0] = DEF_POSE_LEFT_LEG;
-    m_current_point[1] = DEF_POSE_RIGHT_LEG;
-    m_current_point[2] = DEF_POSE_LEFT_LEG;
-    m_current_point[3] = DEF_POSE_RIGHT_LEG;
-    m_current_point[4] = DEF_POSE_LEFT_LEG;
-    m_current_point[5] = DEF_POSE_RIGHT_LEG;
-    */
     
     for(int i = 0; i < NUMBER_OF_LEGS; i++)
     {
@@ -220,15 +173,15 @@ void hexapod_init()
         leg_data[i].state = IDLE;
         leg_data[i].stop = false;
     }
-    /*
-    m_endpoint_out_left = DEF_POSE_LEFT_LEG;
-    m_endpoint_out_right = DEF_POSE_RIGHT_LEG;
-    m_endpoint_in_left = DEF_POSE_LEFT_LEG;
-    m_endpoint_in_right = DEF_POSE_RIGHT_LEG;
-    */
+
     hexapod_servo_pwm_init(leg_pins);
 }
 
+void hexapod_shutdown()
+{
+    //stop the pwm
+    hexapod_servo_pwm_stop();
+}
 
 
 void calculate_endpoints(uint32_t dir_x, uint32_t dir_y, uint32_t rot_x)
@@ -247,7 +200,7 @@ void calc_next_points_leg(uint32_t leg_nr)
     
     p_leg_data = &leg_data[leg_nr];
     
-    //we can't divide by 0
+    //If frames is equal to 0 it means that we are standing still
     if(p_leg_data->frames == 0)
     {
         return;
@@ -317,16 +270,6 @@ void calc_next_points_leg(uint32_t leg_nr)
     
 }
 
-void calc_next_points()
-{
-    //TODO: include flag to block updating PWM if values are not updated
-    
-    for(int i = 0; i < 6; i++)
-    {
-        calc_next_points_leg(i);
-    }
-}
-
 int32_t hexapod_get_next_seq_value(uint32_t leg_nr, hexapod_leg_t *leg)
 {    
 
@@ -337,7 +280,7 @@ int32_t hexapod_get_next_seq_value(uint32_t leg_nr, hexapod_leg_t *leg)
     
     if(leg_nr == 1)
     {
-        NRF_LOG_PRINTF("%d, %d: %d\t%d\t%d\n", p_leg_data->count, p_leg_data->frames, leg->leg_top, leg->leg_mid, leg->leg_bot);
+        //NRF_LOG_PRINTF("%d, %d: %d\t%d\t%d\n", p_leg_data->count, p_leg_data->frames, leg->leg_top, leg->leg_mid, leg->leg_bot);
     }
     
     if(p_leg_data->is_moving == false)
@@ -401,6 +344,20 @@ void print_trajectory(uint32_t leg_nr)
     }
 }
 
+uint32_t max(uint32_t value1, uint32_t value2, uint32_t value3)
+{
+    uint32_t max_value = value1;
+    if(max_value < value2)
+    {
+        max_value = value2;
+    }
+    if(max_value < value3)
+    {
+        max_value = value3;
+    }
+    return max_value;
+}
+
 int32_t abs_int32(int32_t value)
 {
     if(value < 0)
@@ -409,43 +366,254 @@ int32_t abs_int32(int32_t value)
     }
     return value;
 }
-/*
-void calculate_frames()
+
+void calculate_frames(hexapod_leg_t new_endpoint_out_right, hexapod_leg_t new_endpoint_in_right, int32_t *p_transition_frames, int32_t *p_new_frames)
 {
-    uint32_t max;
     
-    switch(m_state)
-        {
-            case IDLE:
-                break;
-            case TRANSITION:
-                max = abs_int32(m_endpoint_in_right.leg_top - m_new_endpoint_out_right.leg_top);
-                break;
-            case NEW_ENDPOINTS:
-                break;
-            default:
-                //ERROR!
-                break;
-        }
+
         
 }
-*/
 
-void hexapod_move_forward(uint8_t speed)
+
+void hexapod_move_forward(bool direction, uint8_t speed)
 {
     
     //TODO: NEED TO CHECK IF LEG IS ALREADY IN TRANSITION
-    //TODO: NEED TO CALCULATE FRAMES
     
     hexapod_leg_data_t *p_leg_data;
     
-    hexapod_leg_t endpoint_front_right = {1700, 1500, 1200};
-    hexapod_leg_t endpoint_back_right = {1300, 1500, 1200};
-    hexapod_leg_t endpoint_front_left = {1300, 1500, 1800};
-    hexapod_leg_t endpoint_back_left = {1700, 1500, 1800};
+    hexapod_leg_t endpoint_1_right = {TOP_LEG_MAX_VALUE, MID_LEG_DEFAULT_VALUE, BOT_LEG_DEFAULT_VALUE};
+    hexapod_leg_t endpoint_2_right = {TOP_LEG_MIN_VALUE, MID_LEG_DEFAULT_VALUE, BOT_LEG_DEFAULT_VALUE};
+    hexapod_leg_t endpoint_1_left = {3000 - TOP_LEG_MAX_VALUE, 3000 - MID_LEG_DEFAULT_VALUE, 3000 - BOT_LEG_DEFAULT_VALUE};
+    hexapod_leg_t endpoint_2_left = {3000 - TOP_LEG_MIN_VALUE, 3000 - MID_LEG_DEFAULT_VALUE, 3000 - BOT_LEG_DEFAULT_VALUE};
     
-    transition_frames = 200/speed;
+    //TODO: NEED TO CALCULATE FRAMES
+    transition_frames = 400/speed;
     new_frames = 400/speed;
+    
+    for( int i = 0; i < NUMBER_OF_LEGS; i++)
+    {
+        p_leg_data = &leg_data[i];
+        
+        if(p_leg_data->is_left_leg)
+        {
+            if(direction)
+            {
+                p_leg_data->new_endpoint_in = endpoint_2_left;
+                p_leg_data->new_endpoint_out = endpoint_1_left;
+            }
+            else
+            {
+                p_leg_data->new_endpoint_in = endpoint_1_left;
+                p_leg_data->new_endpoint_out = endpoint_2_left;
+            }
+        }
+        else
+        {
+            if(direction)
+            {
+                p_leg_data->new_endpoint_in = endpoint_2_right;
+                p_leg_data->new_endpoint_out = endpoint_1_right;
+            }
+            else
+            {
+                p_leg_data->new_endpoint_in = endpoint_1_right;
+                p_leg_data->new_endpoint_out = endpoint_2_right;
+            }
+        }
+        
+        p_leg_data->stop = false;
+        p_leg_data->is_moving = true;
+        p_leg_data->state = TRANSITION;
+    }
+
+    /*
+    print_trajectory(1);
+    print_trajectory(1);
+    print_trajectory(1);
+    */
+    
+}
+
+
+void hexapod_move_sideways(bool direction, uint8_t speed)
+{
+    //TODO: NEED TO CHECK IF LEG IS ALREADY IN TRANSITION
+    
+    hexapod_leg_data_t *p_leg_data;
+    
+    hexapod_leg_t endpoint_1_right = {TOP_LEG_DEFAULT_VALUE, MID_LEG_MAX_VALUE, BOT_LEG_MAX_VALUE};
+    hexapod_leg_t endpoint_2_right = {TOP_LEG_DEFAULT_VALUE, MID_LEG_MIN_VALUE, BOT_LEG_MIN_VALUE};
+    hexapod_leg_t endpoint_1_left = {3000 - TOP_LEG_DEFAULT_VALUE, 3000 - MID_LEG_MIN_VALUE, 3000 - BOT_LEG_MIN_VALUE};
+    hexapod_leg_t endpoint_2_left = {3000 - TOP_LEG_DEFAULT_VALUE, 3000 - MID_LEG_MAX_VALUE, 3000 - BOT_LEG_MAX_VALUE};
+    
+    //TODO: NEED TO CALCULATE FRAMES
+    transition_frames = 400/speed;
+    new_frames = 500/speed;
+    
+    for( int i = 0; i < NUMBER_OF_LEGS; i++)
+    {
+        p_leg_data = &leg_data[i];
+        
+        if(p_leg_data->is_left_leg)
+        {
+            if(direction)
+            {
+                p_leg_data->new_endpoint_in = endpoint_2_left;
+                p_leg_data->new_endpoint_out = endpoint_1_left;
+            }
+            else
+            {
+                p_leg_data->new_endpoint_in = endpoint_1_left;
+                p_leg_data->new_endpoint_out = endpoint_2_left;
+            }
+        }
+        else
+        {
+            if(direction)
+            {
+                p_leg_data->new_endpoint_in = endpoint_2_right;
+                p_leg_data->new_endpoint_out = endpoint_1_right;
+            }
+            else
+            {
+                p_leg_data->new_endpoint_in = endpoint_1_right;
+                p_leg_data->new_endpoint_out = endpoint_2_right;
+            }
+        }
+        
+        p_leg_data->stop = false;
+        p_leg_data->is_moving = true;
+        p_leg_data->state = TRANSITION;
+    }
+/*
+    print_trajectory(1);
+    print_trajectory(1);
+    print_trajectory(1);
+    */
+}
+
+void hexapod_move_diagonal(bool direction, uint8_t speed)
+{
+    //TODO: NEED TO CHECK IF LEG IS ALREADY IN TRANSITION
+    
+    hexapod_leg_data_t *p_leg_data;
+    
+    hexapod_leg_t endpoint_1_right;
+    hexapod_leg_t endpoint_2_right;
+    hexapod_leg_t endpoint_1_left;
+    hexapod_leg_t endpoint_2_left;
+    
+    if(direction)
+    {
+        endpoint_1_right = (hexapod_leg_t){TOP_LEG_MAX_VALUE, MID_LEG_MAX_VALUE, BOT_LEG_MAX_VALUE};
+        endpoint_2_right = (hexapod_leg_t){TOP_LEG_MIN_VALUE, MID_LEG_MIN_VALUE, BOT_LEG_MIN_VALUE};
+        
+        endpoint_1_left = (hexapod_leg_t){3000 - TOP_LEG_MAX_VALUE, 3000 - MID_LEG_MIN_VALUE, 3000 - BOT_LEG_MIN_VALUE};
+        endpoint_2_left = (hexapod_leg_t){3000 - TOP_LEG_MIN_VALUE, 3000 - MID_LEG_MAX_VALUE, 3000 - BOT_LEG_MAX_VALUE};
+    }
+    else
+    {
+        endpoint_1_right = (hexapod_leg_t){1700, 1500, 1200};
+        endpoint_2_right = (hexapod_leg_t){1300, 1700, 1700};
+        
+        endpoint_1_left = (hexapod_leg_t){1300, 1300, 1300};
+        endpoint_2_left = (hexapod_leg_t){1700, 1500, 1800};
+    }
+    
+    //TODO: NEED TO CALCULATE FRAMES
+    transition_frames = 400/speed;
+    new_frames = 500/speed;
+    
+    for( int i = 0; i < NUMBER_OF_LEGS; i++)
+    {
+        p_leg_data = &leg_data[i];
+        
+        if(p_leg_data->is_left_leg)
+        {
+            p_leg_data->new_endpoint_in = endpoint_2_left;
+            p_leg_data->new_endpoint_out = endpoint_1_left;
+        }
+        else
+        {
+            p_leg_data->new_endpoint_in = endpoint_2_right;
+            p_leg_data->new_endpoint_out = endpoint_1_right;
+        }
+        
+        p_leg_data->stop = false;
+        p_leg_data->is_moving = true;
+        p_leg_data->state = TRANSITION;
+    }
+}
+
+void hexapod_turn(bool direction, uint8_t speed)
+{
+    
+    //TODO: NEED TO CHECK IF LEG IS ALREADY IN TRANSITION
+    
+    hexapod_leg_data_t *p_leg_data;
+    
+    hexapod_leg_t endpoint_2_right = {TOP_LEG_MAX_VALUE, MID_LEG_DEFAULT_VALUE, BOT_LEG_DEFAULT_VALUE};
+    hexapod_leg_t endpoint_1_right = {TOP_LEG_MIN_VALUE, MID_LEG_DEFAULT_VALUE, BOT_LEG_DEFAULT_VALUE};
+    hexapod_leg_t endpoint_1_left = {3000 - TOP_LEG_MAX_VALUE, 3000 - MID_LEG_DEFAULT_VALUE, 3000 - BOT_LEG_DEFAULT_VALUE};
+    hexapod_leg_t endpoint_2_left = {3000 - TOP_LEG_MIN_VALUE, 3000 - MID_LEG_DEFAULT_VALUE, 3000 - BOT_LEG_DEFAULT_VALUE};
+    
+    //TODO: NEED TO CALCULATE FRAMES
+    transition_frames = 400/speed;
+    new_frames = 400/speed;
+    
+    for( int i = 0; i < NUMBER_OF_LEGS; i++)
+    {
+        p_leg_data = &leg_data[i];
+        
+        if(p_leg_data->is_left_leg)
+        {
+            if(direction)
+            {
+                p_leg_data->new_endpoint_in = endpoint_2_left;
+                p_leg_data->new_endpoint_out = endpoint_1_left;
+            }
+            else
+            {
+                p_leg_data->new_endpoint_in = endpoint_1_left;
+                p_leg_data->new_endpoint_out = endpoint_2_left;
+            }
+        }
+        else
+        {
+            if(direction)
+            {
+                p_leg_data->new_endpoint_in = endpoint_2_right;
+                p_leg_data->new_endpoint_out = endpoint_1_right;
+            }
+            else
+            {
+                p_leg_data->new_endpoint_in = endpoint_1_right;
+                p_leg_data->new_endpoint_out = endpoint_2_right;
+            }
+        }
+        
+        p_leg_data->stop = false;
+        p_leg_data->is_moving = true;
+        p_leg_data->state = TRANSITION;
+    }
+
+}
+
+void hexapod_stop(uint8_t speed)
+{
+    //TODO: NEED TO CHECK IF LEG IS ALREADY IN TRANSITION
+    
+    hexapod_leg_data_t *p_leg_data;
+    
+    hexapod_leg_t endpoint_front_right = DEF_POSE_RIGHT_LEG;
+    hexapod_leg_t endpoint_back_right = DEF_POSE_RIGHT_LEG;
+    hexapod_leg_t endpoint_front_left = DEF_POSE_LEFT_LEG;
+    hexapod_leg_t endpoint_back_left = DEF_POSE_LEFT_LEG;
+    
+    //TODO: NEED TO CALCULATE FRAMES
+    transition_frames = (BOT_LEG_MAX_VALUE - BOT_LEG_DEFAULT_VALUE)/speed;
+    new_frames = 0;
     
     for( int i = 0; i < NUMBER_OF_LEGS; i++)
     {
@@ -462,484 +630,61 @@ void hexapod_move_forward(uint8_t speed)
             p_leg_data->new_endpoint_out = endpoint_front_right;
         }
         
-        p_leg_data->stop = false;
+        p_leg_data->stop = true;
         p_leg_data->is_moving = true;
         p_leg_data->state = TRANSITION;
     }
-    
-    /*
-    if(is_moving == false)
-    {
-        m_new_frames = 200 / speed;
-    }
-    else
-    {
-        m_new_frames = 400 / speed;
-    }
-    
-    m_new_endpoint_out_right.leg_top = 1700;
-    m_new_endpoint_out_right.leg_mid = 1500;
-    m_new_endpoint_out_right.leg_bot = 1200;
-    
-    m_new_endpoint_in_right.leg_top = 1300;
-    m_new_endpoint_in_right.leg_mid = 1500;
-    m_new_endpoint_in_right.leg_bot = 1200;
-    
-    m_new_endpoint_out_left.leg_top = 1300;
-    m_new_endpoint_out_left.leg_mid = 1500;
-    m_new_endpoint_out_left.leg_bot = 1800;
-    
-    m_new_endpoint_in_left.leg_top = 1700;
-    m_new_endpoint_in_left.leg_mid = 1500;
-    m_new_endpoint_in_left.leg_bot = 1800;
-
-    m_state = TRANSITION;
-    stop = false;
-    is_moving = true;
-    */
-
-    /*
+/*
     print_trajectory(1);
     print_trajectory(1);
     print_trajectory(1);
     */
-    
 }
-/*
 
-void hexapod_move_right(uint8_t speed)
+void hexapod_test_sequence(uint8_t speed)
 {
-    //change this
-    if(is_moving == false)
-    {
-        m_new_frames = 200 / speed;
-    }
-    else
-    {
-        m_new_frames = 500 / speed;
-    }
+    NRF_LOG("\nFORWARD\n\n");
+    hexapod_move_forward(true, speed);
     
-    //CHANGE THIS!
-    m_frames = 200 / speed;
+    nrf_delay_ms(4000);
     
-    m_new_endpoint_out_right.leg_top = 1500;
-    m_new_endpoint_out_right.leg_mid = 1700;
-    m_new_endpoint_out_right.leg_bot = 1700;
+    NRF_LOG("\nBACKWARD\n\n");
+    hexapod_move_forward(false, speed);
     
-    m_new_endpoint_in_right.leg_top = 1500;
-    m_new_endpoint_in_right.leg_mid = 1500;
-    m_new_endpoint_in_right.leg_bot = 1200;
+    nrf_delay_ms(4000);
     
-    m_new_endpoint_out_left.leg_top = 1500;
-    m_new_endpoint_out_left.leg_mid = 1300;
-    m_new_endpoint_out_left.leg_bot = 1300;
+    NRF_LOG("\nRIGHT\n\n");
+    hexapod_move_sideways(true, speed);
     
-    m_new_endpoint_in_left.leg_top = 1500;
-    m_new_endpoint_in_left.leg_mid = 1500;
-    m_new_endpoint_in_left.leg_bot = 1800;
-
-    m_state = TRANSITION;
-    stop = false;
-    is_moving = true;
-
-    print_trajectory(1);
-    print_trajectory(1);
-    print_trajectory(1);
+    nrf_delay_ms(4000);
+    
+    NRF_LOG("\nLEFT\n\n");
+    hexapod_move_sideways(false, speed);
+    
+    nrf_delay_ms(4000);
+    
+    NRF_LOG("\nDIAGONAL RIGHT FORWARD\n\n");
+    hexapod_move_diagonal(true, speed);
+    
+    nrf_delay_ms(4000);
+    
+    NRF_LOG("\nDIAGONAL LEFT FORWARD\n\n");
+    hexapod_move_diagonal(false, speed);
+    
+    nrf_delay_ms(4000);
+    
+    NRF_LOG("\nTURN CW\n\n");
+    hexapod_turn(true, speed);
+    
+    nrf_delay_ms(4000);
+    
+    NRF_LOG("\nTURN CCW\n\n");
+    hexapod_turn(false, speed);
+    
+    nrf_delay_ms(4000);
+    
+    NRF_LOG("\nSTOP\n\n");
+    hexapod_stop(speed);
+    
+    nrf_delay_ms(4000);
 }
-
-void hexapod_stop(uint8_t speed)
-{
-    //change this
-
-    m_new_frames = 200 / speed;
-    
-    m_new_endpoint_out_right = DEF_POSE_RIGHT_LEG;
-    m_new_endpoint_in_right = DEF_POSE_RIGHT_LEG;
-    
-    m_new_endpoint_out_left = DEF_POSE_LEFT_LEG;
-    m_new_endpoint_in_left = DEF_POSE_LEFT_LEG;
-
-    stop = true;
-    is_moving = true;
-    m_state = TRANSITION;
-
-    print_trajectory(1);
-    print_trajectory(1);
-    print_trajectory(1);
-}
-*/
-
-///OLD CODE USING SEQUENCE:
-/*
-void change_direction(hexapod_dir_t direction)
-{
-    m_direction = direction;
-    m_change_direction = true;
-}
-
-int32_t hexapod_get_next_seq_value(uint32_t leg_number, hexapod_leg_t *leg)
-{
-    if(m_seq_updated[leg_number])
-    {
-        if(m_seq_count[leg_number] == m_frames)
-        {
-            //stop if sequence should not be repeated
-            if(m_repeat_seq == false)
-            {
-                for(int i = 0; i < 6; i++)
-                {
-                    m_seq_updated[i] = false;
-                }
-                
-                if(m_change_direction == true)
-                {
-                    
-                    
-                    m_change_direction = false;
-                }
-                
-                return -1;
-            }
-            
-            //TODO: do calculating of new trajectory in main with app_scheduler
-            
-            //check if new trajectory should be calculated
-            if(m_change_direction == true)
-            {
-                 
-            }
-            else
-            {
-                m_seq_count[leg_number] = 0;
-            }
-        }
-        if((leg_number % 2) == 0)
-        {
-            //left leg
-            *leg = m_leg_seq_left[m_seq_count[leg_number]];
-        }
-        else
-        {
-            //right leg
-            *leg = m_leg_seq_right[m_seq_count[leg_number]];
-        }
-        
-        m_seq_count[leg_number]++;
-        return 0;
-    }
-    return -1;
-}
-
-
-
-uint32_t max(uint32_t value1, uint32_t value2, uint32_t value3)
-{
-    uint32_t max_value = value1;
-    if(max_value < value2)
-    {
-        max_value = value2;
-    }
-    if(max_value < value3)
-    {
-        max_value = value3;
-    }
-    return max_value;
-}
-
-void calculate_trajectory(hexapod_leg_t endpoint_front, hexapod_leg_t endpoint_back, hexapod_dir_t direction, int32_t frames)
-{
-    //uses leg 0 (any leg can be used)
-    hexapod_leg_t current_point = endpoint_back;
-    
-    int32_t diff_top = endpoint_front.leg_top - current_point.leg_top;
-    int32_t diff_mid = endpoint_front.leg_mid - current_point.leg_mid;
-    int32_t diff_bot = endpoint_front.leg_bot - current_point.leg_bot;
-    
-    int32_t right_way_lift_height = 0;
-    int32_t left_way_lift_height = 0;
-    
-    bool turn = false;
-    
-    switch(direction)
-    {
-        case FORWARD:
-            break;
-        case BACKWARD:
-            break;
-        case RIGHT:
-        case FORWARD_RIGHT:
-        case BACKWARD_RIGHT:
-            right_way_lift_height = LEG_LIFT_HEIGHT;
-            break;
-        case LEFT:
-        case FORWARD_LEFT:
-        case BACKWARD_LEFT:
-            left_way_lift_height = LEG_LIFT_HEIGHT;
-            break;
-        case CW_TURN:
-        case CCW_TURN:
-            turn = true;
-            break;
-    }
-    
-    //TOP SERVO
-    for(int i = 0; i < frames; i++)
-    {
-        m_leg_seq_right[i].leg_top = current_point.leg_top + diff_top*i/frames;
-        m_leg_seq_right[frames*2 - i - 1].leg_top = current_point.leg_top + diff_top*(i+1)/frames;  
-
-        if(turn)
-        {
-            m_leg_seq_left[i].leg_top = 3000 - m_leg_seq_right[i].leg_top;
-            m_leg_seq_left[frames*2 - i - 1].leg_top = 3000 - m_leg_seq_right[i].leg_top;
-        }
-        else
-        {
-            m_leg_seq_left[i].leg_top = 3000 - (endpoint_front.leg_top - diff_top*i/frames);        
-            m_leg_seq_left[frames*2 - i - 1].leg_top = 3000 - (endpoint_front.leg_top - diff_top*(i+1)/frames);
-        }
-    }
-    
-    
-    //MIDDLE SERVO
-    for(int i = 0; i < frames/2; i++)
-    {
-        //first quarter
-        m_leg_seq_right[i].leg_mid = current_point.leg_mid + (diff_mid+2*LEG_LIFT_HEIGHT)*i/frames;     //curr + (diff/2+height)*i/(frames/2)
-        m_leg_seq_left[i].leg_mid = 3000 - (current_point.leg_mid + diff_mid*i/frames);
-        //forth quarter
-        m_leg_seq_right[frames*2 - i - 1].leg_mid = current_point.leg_mid + diff_mid*(i+1)/frames;
-        m_leg_seq_left[frames*2 - i - 1].leg_mid = 3000 - (current_point.leg_mid + (diff_mid + 2*LEG_LIFT_HEIGHT)*(i+1)/frames);
-    }
-    for(int i = 0; i < frames/2; i++)
-    {
-        //second quarter
-        m_leg_seq_right[i + frames/2].leg_mid = current_point.leg_mid + (diff_mid/2 + LEG_LIFT_HEIGHT) + diff_mid*i/frames - 2*LEG_LIFT_HEIGHT*i/frames; //curr + (diff/2+height) + (diff-diff/2-height)*i/(frames/2)
-        m_leg_seq_left[i + frames/2].leg_mid = 3000 - (current_point.leg_mid + diff_mid/2 + diff_mid*i/frames);
-        //third quarter
-        m_leg_seq_right[frames * 3 / 2 - i - 1].leg_mid = current_point.leg_mid + diff_mid/2 + diff_mid*(i+1)/frames;
-        m_leg_seq_left[frames * 3 / 2 - i - 1].leg_mid = 3000 - (current_point.leg_mid + (diff_mid/2 + LEG_LIFT_HEIGHT) + diff_mid*(i+1)/frames - 2*LEG_LIFT_HEIGHT*(i+1)/frames);
-    }
-    
-    //BOTTOM SERVO
-    for(int i = 0; i < frames/2; i++)
-    {
-        //m_leg_seq[i].leg_bot = current_point.leg_bot + (diff_bot+2*LEG_LIFT_HEIGHT)*i/frames;     //curr + (diff/2+height)*i/(frames/2)
-        m_leg_seq_right[i].leg_bot = current_point.leg_bot + (diff_bot)*i/frames;
-        m_leg_seq_left[i].leg_bot = 3000 - m_leg_seq_right[i].leg_bot;
-        
-        m_leg_seq_right[frames*2 - i - 1].leg_bot = current_point.leg_bot + diff_bot*(i+1)/frames;
-        m_leg_seq_left[frames*2 - i - 1].leg_bot = 3000 - m_leg_seq_right[frames*2 - i - 1].leg_bot;
-    }
-    for(int i = 0; i < frames/2; i++)
-    {
-        //m_leg_seq[i + frames/2].leg_bot = current_point.leg_bot + (diff_bot/2 + LEG_LIFT_HEIGHT) + diff_bot*i/frames - 2*LEG_LIFT_HEIGHT*i/frames; //curr + (diff/2+height) + (diff-diff/2-height)*i/(frames/2)
-        m_leg_seq_right[i + frames/2].leg_bot = current_point.leg_bot + (diff_bot/2) + diff_bot*i/frames;
-        m_leg_seq_left[i + frames/2].leg_bot = 3000 - m_leg_seq_right[i + frames/2].leg_bot;
-        
-        m_leg_seq_right[frames * 3 / 2 - i - 1].leg_bot = current_point.leg_bot + diff_bot/2 + diff_bot*(i+1)/frames;
-        m_leg_seq_left[frames * 3 / 2 - i - 1].leg_bot = 3000 - m_leg_seq_right[frames * 3 / 2 - i - 1].leg_bot;
-    }
-    
-    m_frames = frames*2;
-    
-}
-
-void print_directory()
-{
-    NRF_LOG_PRINTF("directory:\nRight leg\t\t\tLeft leg\nT\tM\tB\t\tT\tM\tB\t\n");
-    for(int i = 0; i < m_frames; i++)
-    {
-        NRF_LOG_PRINTF("%d\t%d\t%d\t\t%d\t%d\t%d\t\n", 
-        m_leg_seq_right[i].leg_top, m_leg_seq_right[i].leg_mid, m_leg_seq_right[i].leg_bot,
-        m_leg_seq_left[i].leg_top, m_leg_seq_left[i].leg_mid, m_leg_seq_left[i].leg_bot);
-        nrf_delay_ms(10);
-    }
-}
-
-void hexapod_move_forward(uint8_t speed)
-{
-    for(int i = 0; i < 6; i++)
-    {
-        m_seq_updated[i] = false;
-    }
-    
-    hexapod_leg_t endpoint_front = {1700, 1500, 1200};
-    hexapod_leg_t endpoint_back = {1300, 1500, 1200};
-    
-    uint32_t frames = (1700 - 1300) / speed;
-    calculate_trajectory(endpoint_front, endpoint_back, FORWARD, frames);
-    
-    //if group 1 and right leg -> start at frames
-    //if group 2 and left leg ->start at frames
-    
-    //group 1
-    m_seq_count[0] = 0;
-    m_seq_count[3] = frames;
-    m_seq_count[4] = 0;
-    
-    //group 2
-    m_seq_count[1] = 0;
-    m_seq_count[2] = frames;
-    m_seq_count[5] = 0;
-    
-    //print_directory();
-    
-    for(int i = 0; i < 6; i++)
-    {
-        m_seq_updated[i] = true;
-    }
-}
-
-void hexapod_move_right(uint8_t speed)
-{
-    for(int i = 0; i < 6; i++)
-    {
-        m_seq_updated[i] = false;
-    }
-    
-    hexapod_leg_t endpoint_right = {1500, 1700, 1700};
-    hexapod_leg_t endpoint_left = {1500, 1500, 1200};
-    
-    uint32_t frames = (1700 - 1200) / speed;
-    calculate_trajectory(endpoint_right, endpoint_left, RIGHT, frames);
-    
-    //group 1
-    m_seq_count[0] = 0;
-    m_seq_count[3] = frames;
-    m_seq_count[4] = 0;
-    
-    //group 2
-    m_seq_count[1] = 0;
-    m_seq_count[2] = frames;
-    m_seq_count[5] = 0;
-    
-    //print_directory();
-    
-    for(int i = 0; i < 6; i++)
-    {
-        m_seq_updated[i] = true;
-    }
-}
-
-void hexapod_move_diagonal(uint8_t speed)
-{
-    for(int i = 0; i < 6; i++)
-    {
-        m_seq_updated[i] = false;
-    }
-    
-    hexapod_leg_t endpoint_front_right = {1700, 1700, 1700};
-    hexapod_leg_t endpoint_back_left = {1300, 1500, 1200};
-    
-    uint32_t frames = (1700 - 1200) / speed;
-    calculate_trajectory(endpoint_front_right, endpoint_back_left, RIGHT, frames);
-    
-    //group 1
-    m_seq_count[0] = 0;
-    m_seq_count[3] = frames;
-    m_seq_count[4] = 0;
-    
-    //group 2
-    m_seq_count[1] = 0;
-    m_seq_count[2] = frames;
-    m_seq_count[5] = 0;
-    
-    for(int i = 0; i < 6; i++)
-    {
-        m_seq_updated[i] = true;
-    }
-}
-
-void hexapod_turn_clockwise(uint8_t speed)
-{
-    for(int i = 0; i < 6; i++)
-    {
-        m_seq_updated[i] = false;
-    }
-    
-    hexapod_leg_t endpoint_front = {1700, 1500, 1200};
-    hexapod_leg_t endpoint_back = {1300, 1500, 1200};
-    
-    uint32_t frames = (1700 - 1300) / speed;
-    calculate_trajectory(endpoint_front, endpoint_back, CW_TURN, frames);
-    
-    //if group 1 and right leg -> start at frames
-    //if group 2 and left leg ->start at frames
-    
-    //group 1
-    m_seq_count[0] = 0;
-    m_seq_count[3] = frames;
-    m_seq_count[4] = 0;
-    
-    //group 2
-    m_seq_count[1] = 0;
-    m_seq_count[2] = frames;
-    m_seq_count[5] = 0;
-    
-    for(int i = 0; i < 6; i++)
-    {
-        m_seq_updated[i] = true;
-    }
-}
-
-void calculate_change_trajectory(hexapod_dir_t last_dir, hexapod_dir_t new_dir)
-{
-    hexapod_leg_t endpoint_1;
-    hexapod_leg_t endpoint_2;
-    
-    switch(last_dir)
-    {
-        case FORWARD:
-        case BACKWARD:
-            endpoint_1 = (hexapod_leg_t){1700, 1500, 1200};
-            break;
-        case RIGHT:
-        case LEFT:
-            endpoint_1 = (hexapod_leg_t){1500, 1700, 1700};
-            break;
-        case FORWARD_RIGHT:
-        case BACKWARD_RIGHT:
-            //not implemented yet
-            break;
-        case FORWARD_LEFT:
-        case BACKWARD_LEFT:
-            //not implemented yet
-            break;
-        case CW_TURN:
-        case CCW_TURN:
-            //not implemented yet
-            break;
-        case STOP:
-            break;
-    }
-    
-    switch(new_dir)
-    {
-        case FORWARD:
-        case BACKWARD:
-            endpoint_2 = (hexapod_leg_t){1300, 1500, 1200};
-            break;
-        case RIGHT:
-        case LEFT:
-            endpoint_2 = (hexapod_leg_t){1500, 1500, 1200};
-            break;
-        case FORWARD_RIGHT:
-        case BACKWARD_RIGHT:
-            //not implemented yet
-            break;
-        case FORWARD_LEFT:
-        case BACKWARD_LEFT:
-            //not implemented yet
-            break;
-        case CW_TURN:
-        case CCW_TURN:
-            //not implemented yet
-            break;
-        case STOP:
-            break;
-    }
-}
-
-*/
-
