@@ -52,7 +52,7 @@
 #define CENTRAL_LINK_COUNT              0                                           /**< Number of central links used by the application. When changing this number remember to adjust the RAM settings*/
 #define PERIPHERAL_LINK_COUNT           1                                           /**< Number of peripheral links used by the application. When changing this number remember to adjust the RAM settings*/
 
-#define DEVICE_NAME                     "Nordic_BUG"                               /**< Name of device. Will be included in the advertising data. */
+#define DEVICE_NAME                     "Nrf_hexapod"                               /**< Name of device. Will be included in the advertising data. */
 #define NUS_SERVICE_UUID_TYPE           BLE_UUID_TYPE_VENDOR_BEGIN                  /**< UUID type for the Nordic UART Service (vendor specific). */
 
 #define APP_ADV_INTERVAL                64                                          /**< The advertising interval (in units of 0.625 ms. This value corresponds to 40 ms). */
@@ -76,6 +76,7 @@
 
 //ADC
 #define BATTERY_LEVEL_MEAS_INTERVAL         APP_TIMER_TICKS(1000, APP_TIMER_PRESCALER) /**< Battery level measurement interval (ticks). This value corresponds to 1 second. */
+#define BATTERY_LOW_LEG_BLINKING_INTERVAL   APP_TIMER_TICKS(500, APP_TIMER_PRESCALER)
 
 #define ADC_REF_VOLTAGE_IN_MILLIVOLTS       600                                          /**< Reference voltage (in milli volts) used by ADC while doing conversion. */
 #define ADC_PRE_SCALING_COMPENSATION        6                                            /**< The ADC is configured to use VDD with 1/3 prescaling as input. And hence the result of conversion is to be multiplied by 3 to get the actual value of the battery voltage.*/
@@ -90,6 +91,7 @@
         
 static nrf_saadc_value_t adc_buf[2];
 APP_TIMER_DEF(m_battery_timer_id);                                               /**< Battery measurement timer. */
+APP_TIMER_DEF(m_battery_low_led_timer_id);
 
 static ble_nus_t                        m_nus;                                      /**< Structure to identify the Nordic UART Service. */
 static uint16_t                         m_conn_handle = BLE_CONN_HANDLE_INVALID;    /**< Handle of the current connection. */
@@ -144,6 +146,7 @@ void saadc_event_handler(nrf_drv_saadc_evt_t const * p_event)
         if(batt_lvl_in_milli_volts < 3200)
         {
             //hexapod_shutdown();
+            //blink led 3 and 4
         }
         
         //Bas is not supported yet
@@ -199,6 +202,14 @@ static void battery_level_meas_timeout_handler(void * p_context)
     APP_ERROR_CHECK(err_code);
 }
 
+static void battery_low_led_timeout_handler(void * p_context)
+{
+    UNUSED_PARAMETER(p_context);
+
+    LEDS_INVERT(BSP_LED_2_MASK);
+    LEDS_INVERT(BSP_LED_2_MASK | BSP_LED_3_MASK);
+}
+
 /**@brief Function for the Timer initialization.
  *
  * @details Initializes the timer module. This creates and starts application timers.
@@ -214,6 +225,12 @@ static void timers_init(void)
     err_code = app_timer_create(&m_battery_timer_id,
                                 APP_TIMER_MODE_REPEATED,
                                 battery_level_meas_timeout_handler);
+    APP_ERROR_CHECK(err_code);
+    
+    // Create battery low led blinking timer
+    err_code = app_timer_create(&m_battery_low_led_timer_id,
+                                APP_TIMER_MODE_REPEATED,
+                                battery_low_led_timeout_handler);
     APP_ERROR_CHECK(err_code);
 }
 
@@ -576,13 +593,18 @@ int main(void)
     NRF_LOG("\033[2J\033[;H");
     NRF_LOG("\n\n<<<<<<<<< START >>>>>>>>>>\n\n");
 
+    LEDS_CONFIGURE(BSP_LED_2_MASK | BSP_LED_3_MASK);
+    
     // Initialize.
     timers_init();
     APP_SCHED_INIT(SCHED_MAX_EVENT_DATA_SIZE, SCHED_QUEUE_SIZE);
     
     ble_stack_init();
     
-    //sd_power_dcdc_mode_set(NRF_POWER_DCDC_ENABLE);
+    err_code = sd_clock_hfclk_request();
+    APP_ERROR_CHECK(err_code);
+    
+    sd_power_dcdc_mode_set(NRF_POWER_DCDC_ENABLE);
     
     gap_params_init();
     services_init();
@@ -592,9 +614,13 @@ int main(void)
     application_timers_start();
     err_code = ble_advertising_start(BLE_ADV_MODE_FAST);
     APP_ERROR_CHECK(err_code);
-
+    
+    err_code = app_timer_start(m_battery_low_led_timer_id, BATTERY_LOW_LEG_BLINKING_INTERVAL, NULL);
+    APP_ERROR_CHECK(err_code);
+    
     hexapod_init();
     
+    //hexapod_move_sideways(true, 10);
     
     // Enter main loop.
     for (;;)

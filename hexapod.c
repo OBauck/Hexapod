@@ -24,7 +24,7 @@
 #define MID_LEG_MIN_VALUE (1500 + LEG_HEIGHT_OFFSET)
 
 #define BOT_LEG_DEFAULT_VALUE (1200 + LEG_HEIGHT_OFFSET)
-#define BOT_LEG_MAX_VALUE (1700 + LEG_HEIGHT_OFFSET)
+#define BOT_LEG_MAX_VALUE (1500 + LEG_HEIGHT_OFFSET)
 #define BOT_LEG_MIN_VALUE (1200 + LEG_HEIGHT_OFFSET)
 
 #define DEF_POSE_LEFT_LEG (hexapod_leg_t){3000 - TOP_LEG_DEFAULT_VALUE, 3000 - MID_LEG_DEFAULT_VALUE, 3000 - BOT_LEG_DEFAULT_VALUE}
@@ -278,9 +278,9 @@ int32_t hexapod_get_next_seq_value(uint32_t leg_nr, hexapod_leg_t *leg)
     p_leg_data = &leg_data[leg_nr];
     *leg = p_leg_data->current_point;
     
-    if(leg_nr == 1)
+    if(leg_nr == 0)
     {
-        //NRF_LOG_PRINTF("%d, %d: %d\t%d\t%d\n", p_leg_data->count, p_leg_data->frames, leg->leg_top, leg->leg_mid, leg->leg_bot);
+        NRF_LOG_PRINTF("%d, %d: %d\t%d\t%d\n", p_leg_data->count, p_leg_data->frames, leg->leg_top, leg->leg_mid, leg->leg_bot);
     }
     
     if(p_leg_data->is_moving == false)
@@ -449,7 +449,7 @@ void hexapod_move_sideways(bool direction, uint8_t speed)
     
     //TODO: NEED TO CALCULATE FRAMES
     transition_frames = 400/speed;
-    new_frames = 500/speed;
+    new_frames = 300/speed;
     
     for( int i = 0; i < NUMBER_OF_LEGS; i++)
     {
@@ -514,16 +514,16 @@ void hexapod_move_diagonal(bool direction, uint8_t speed)
     }
     else
     {
-        endpoint_1_right = (hexapod_leg_t){1700, 1500, 1200};
-        endpoint_2_right = (hexapod_leg_t){1300, 1700, 1700};
+        endpoint_1_right = (hexapod_leg_t){TOP_LEG_MAX_VALUE, MID_LEG_MIN_VALUE, BOT_LEG_MIN_VALUE};
+        endpoint_2_right = (hexapod_leg_t){TOP_LEG_MIN_VALUE, MID_LEG_MAX_VALUE, BOT_LEG_MAX_VALUE};
         
-        endpoint_1_left = (hexapod_leg_t){1300, 1300, 1300};
-        endpoint_2_left = (hexapod_leg_t){1700, 1500, 1800};
+        endpoint_1_left = (hexapod_leg_t){3000 - TOP_LEG_MAX_VALUE, 3000 - MID_LEG_MAX_VALUE, 3000 - BOT_LEG_MAX_VALUE};
+        endpoint_2_left = (hexapod_leg_t){3000 - TOP_LEG_MIN_VALUE, 3000 - MID_LEG_MIN_VALUE, 3000 - BOT_LEG_MIN_VALUE};
     }
     
     //TODO: NEED TO CALCULATE FRAMES
     transition_frames = 400/speed;
-    new_frames = 500/speed;
+    new_frames = 400/speed;
     
     for( int i = 0; i < NUMBER_OF_LEGS; i++)
     {
