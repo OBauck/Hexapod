@@ -76,19 +76,22 @@
 
 //ADC
 #define BATTERY_LEVEL_MEAS_INTERVAL         APP_TIMER_TICKS(1000, APP_TIMER_PRESCALER) /**< Battery level measurement interval (ticks). This value corresponds to 1 second. */
-#define BATTERY_LOW_LEG_BLINKING_INTERVAL   APP_TIMER_TICKS(500, APP_TIMER_PRESCALER)
+#define BATTERY_LOW_LEG_BLINKING_INTERVAL   APP_TIMER_TICKS(250, APP_TIMER_PRESCALER)
 
 #define ADC_REF_VOLTAGE_IN_MILLIVOLTS       600                                          /**< Reference voltage (in milli volts) used by ADC while doing conversion. */
-#define ADC_PRE_SCALING_COMPENSATION        6                                            /**< The ADC is configured to use VDD with 1/3 prescaling as input. And hence the result of conversion is to be multiplied by 3 to get the actual value of the battery voltage.*/
-#define DIODE_FWD_VOLT_DROP_MILLIVOLTS      270                                          /**< Typical forward voltage drop of the diode (Part no: SD103ATW-7-F) that is connected in series with the voltage supply. This is the voltage drop when the forward current is 1mA. Source: Data sheet of 'SURFACE MOUNT SCHOTTKY BARRIER DIODE ARRAY' available at www.diodes.com. */
-#define REGULATOR_FWD_VOLT_DROP_MILLIVOLTS  300                                         /**< See AP7333 datasheet       */     
+#define ADC_PRE_SCALING_COMPENSATION        (5 * 250) / 175                              /**< We have a gain on 1/5 and a external resisitor divider of 1.75/(1.75+0.75)*/
 
 #define ADC_INPUT_PRESCALER                 3                                            /**< Input prescaler for ADC convestion on NRF51. */
 #define ADC_RES_10BIT                       1024                                         /**< Maximum digital value for 10-bit ADC conversion. */
 
 #define ADC_RESULT_IN_MILLI_VOLTS(ADC_VALUE)\
-        ((((ADC_VALUE) * ADC_REF_VOLTAGE_IN_MILLIVOLTS) / ADC_RES_10BIT) * ADC_PRE_SCALING_COMPENSATION)
+        ((((ADC_VALUE) * ADC_REF_VOLTAGE_IN_MILLIVOLTS) * ADC_PRE_SCALING_COMPENSATION) / ADC_RES_10BIT)
         
+#define ADC_ALPHA_PERCENT                    5  
+#define MAX_NR_OF_LOW_SAMPLES               3
+#define ADC_SEND_INTERVAL                   10                                  /** Send battery voltage every 10 samples*/    
+
+//static bool first_adc_measurement = true;
 static nrf_saadc_value_t adc_buf[2];
 APP_TIMER_DEF(m_battery_timer_id);                                               /**< Battery measurement timer. */
 APP_TIMER_DEF(m_battery_low_led_timer_id);
@@ -125,28 +128,76 @@ void saadc_event_handler(nrf_drv_saadc_evt_t const * p_event)
     if (p_event->type == NRF_DRV_SAADC_EVT_DONE)
     {
         nrf_saadc_value_t adc_result;
-        uint16_t          batt_lvl_in_milli_volts;
+        static uint16_t          batt_lvl_in_milli_volts;
+        static uint8_t           batt_low_count = 0;
+        static uint8_t          batt_sample_count = 0;    
         //uint8_t           percentage_batt_lvl;
         uint32_t          err_code;
 
+        NRF_PPI->CHENCLR = (PPI_CHENCLR_CH10_Enabled << PPI_CHENCLR_CH10_Pos);
+        nrf_gpio_pin_toggle(27);
+        
         adc_result = p_event->data.done.p_buffer[0];
 
         err_code = nrf_drv_saadc_buffer_convert(p_event->data.done.p_buffer, 1);
         APP_ERROR_CHECK(err_code);
 
-        //The battery voltage will be at least this value
-        //TODO find out if regulator dropout voltage is needed (datasheet says about 0V on low current consumption)
+        //exponential moving average filter, should not be necessary
+        /*
+        if(first_adc_measurement == true)
+        {
+            //first adc measurement, do not apply filtering
+            batt_lvl_in_milli_volts = ADC_RESULT_IN_MILLI_VOLTS(adc_result);
+            first_adc_measurement = false;
+        }
+        else
+        {
+            //not first adc measurement, apply exponential moving average filter (https://en.wikipedia.org/wiki/Moving_average)
+            batt_lvl_in_milli_volts = (ADC_RESULT_IN_MILLI_VOLTS(adc_result) * ADC_ALPHA_PERCENT + batt_lvl_in_milli_volts * (100 - ADC_ALPHA_PERCENT)) / 100;
+        }
+        */
+        
         batt_lvl_in_milli_volts = ADC_RESULT_IN_MILLI_VOLTS(adc_result);
         
-        //NRF_LOG_PRINTF("Battery voltage: %d\n", batt_lvl_in_milli_volts);
+        //NRF_LOG_PRINTF("Battery voltage: %d, %d\n", adc_result, batt_lvl_in_milli_volts);
         
-        //if battery voltage is below 3.2V we shut down the servos
-        //TODO: implement a low pass filter to avoid drops in voltage leading to shutdown
+        //send the battery voltage if ADC_SEND_INTERVAL samples have been done since last sending
+        batt_sample_count++;
         
+        if(batt_sample_count >= ADC_SEND_INTERVAL)
+        {
+            batt_sample_count = 0;
+            
+            char data_array[BLE_NUS_MAX_DATA_LEN];
+            int index = sprintf(data_array, "Vbatt: %dmV", batt_lvl_in_milli_volts);
+            if((index < BLE_NUS_MAX_DATA_LEN) && (index > 0))
+            {
+                ble_nus_string_send(&m_nus, (uint8_t *)data_array, index);
+            }
+        }
+        
+        //if battery voltage is below 3.2V for MAX_NR_OF_LOW_SAMPLES samples we shut down the servos
+
         if(batt_lvl_in_milli_volts < 3200)
         {
-            //hexapod_shutdown();
-            //blink led 3 and 4
+            batt_low_count++;
+            
+            if(batt_low_count >= MAX_NR_OF_LOW_SAMPLES)
+            {
+                //Shutdown
+                hexapod_shutdown();
+                //stop adc measuring
+                err_code = app_timer_stop(m_battery_timer_id);
+                APP_ERROR_CHECK(err_code);
+                //blink led 3 and 4
+                err_code = app_timer_start(m_battery_low_led_timer_id, BATTERY_LOW_LEG_BLINKING_INTERVAL, NULL);
+                APP_ERROR_CHECK(err_code);
+                LEDS_INVERT(BSP_LED_2_MASK);
+            }
+        }
+        else
+        {
+            batt_low_count = 0;
         }
         
         //Bas is not supported yet
@@ -181,7 +232,12 @@ static void adc_configure(void)
     ret_code_t err_code = nrf_drv_saadc_init(NULL, saadc_event_handler);
     APP_ERROR_CHECK(err_code);
 
-    nrf_saadc_channel_config_t config = NRF_DRV_SAADC_DEFAULT_CHANNEL_CONFIG_SE(NRF_SAADC_INPUT_VDD);
+    nrf_saadc_channel_config_t config = NRF_DRV_SAADC_DEFAULT_CHANNEL_CONFIG_SE(NRF_SAADC_INPUT_AIN0);
+    
+    //since we are using a large resistor we have to use the larger acq time
+    config.acq_time = NRF_SAADC_ACQTIME_40US;
+    config.gain = NRF_SAADC_GAIN1_5;
+    
     err_code = nrf_drv_saadc_channel_init(0,&config);
     APP_ERROR_CHECK(err_code);
 
@@ -196,17 +252,21 @@ static void battery_level_meas_timeout_handler(void * p_context)
 {
     UNUSED_PARAMETER(p_context);
 
-    uint32_t err_code;
+    //uint32_t err_code;
     adc_configure();
-    err_code = nrf_drv_saadc_sample();
-    APP_ERROR_CHECK(err_code);
+    
+    NRF_PPI->CH[10].TEP = (uint32_t)&NRF_SAADC->TASKS_SAMPLE;
+    NRF_PPI->CH[10].EEP = (uint32_t)&NRF_TIMER4->EVENTS_COMPARE[0];
+    NRF_PPI->CHENSET = (PPI_CHENSET_CH10_Enabled << PPI_CHENSET_CH10_Pos);
+    
+    //err_code = nrf_drv_saadc_sample();
+    //APP_ERROR_CHECK(err_code);
 }
 
 static void battery_low_led_timeout_handler(void * p_context)
 {
     UNUSED_PARAMETER(p_context);
 
-    LEDS_INVERT(BSP_LED_2_MASK);
     LEDS_INVERT(BSP_LED_2_MASK | BSP_LED_3_MASK);
 }
 
@@ -594,6 +654,7 @@ int main(void)
     NRF_LOG("\n\n<<<<<<<<< START >>>>>>>>>>\n\n");
 
     LEDS_CONFIGURE(BSP_LED_2_MASK | BSP_LED_3_MASK);
+    LEDS_OFF(BSP_LED_2_MASK | BSP_LED_3_MASK);
     
     // Initialize.
     timers_init();
@@ -615,11 +676,9 @@ int main(void)
     err_code = ble_advertising_start(BLE_ADV_MODE_FAST);
     APP_ERROR_CHECK(err_code);
     
-    err_code = app_timer_start(m_battery_low_led_timer_id, BATTERY_LOW_LEG_BLINKING_INTERVAL, NULL);
-    APP_ERROR_CHECK(err_code);
-    
     hexapod_init();
     
+    nrf_gpio_cfg_output(27);
     //hexapod_move_sideways(true, 10);
     
     // Enter main loop.
