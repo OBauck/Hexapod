@@ -276,15 +276,14 @@ void hexapod_servo_pwm_start()
 
     NRF_TIMER4->TASKS_START = 1;
     
-    nrf_delay_ms(1000);
-    
     //ppi to allow timer 3 to be in sync with timer 4
     NRF_PPI->CH[10].TEP = (uint32_t)&NRF_TIMER3->TASKS_START;
     NRF_PPI->CH[10].EEP = (uint32_t)&NRF_TIMER4->EVENTS_COMPARE[0];
     NRF_PPI->CHENSET = (PPI_CHENSET_CH10_Enabled << PPI_CHENSET_CH10_Pos);
     
+    NRF_TIMER4->EVENTS_COMPARE[0] = 0;
     while(NRF_TIMER4->EVENTS_COMPARE[0] == 0);
-    nrf_delay_ms(100);
+    //nrf_delay_ms(100);
         
     NRF_PPI->CHENCLR = (PPI_CHENCLR_CH10_Enabled << PPI_CHENCLR_CH10_Pos);
     
