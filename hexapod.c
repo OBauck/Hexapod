@@ -101,32 +101,6 @@ hexapod_leg_data_t leg_data[6];
 static int32_t new_frames = 0;
 static int32_t transition_frames = 0;
 
-/*
-static int32_t m_frames = 0;
-static int32_t m_new_frames = 0;
-static int32_t m_count[6] = {0, 0, 0, 0, 0, 0};
-static bool direction[6] = {false, true, true, false, false, true};
-static bool new_direction[6];
-static hexapod_leg_t m_current_point[6];
-static uint32_t m_endpoint_reached = 6;
-volatile bool is_moving = false;
-volatile bool stop = false;
-
-hexapod_state_t m_state = IDLE;
-//static bool new_endpoints = false;
-//static bool transition = false;
-
-static hexapod_leg_t m_endpoint_out_left;
-static hexapod_leg_t m_endpoint_out_right;
-static hexapod_leg_t m_endpoint_in_left;
-static hexapod_leg_t m_endpoint_in_right;
-
-static hexapod_leg_t m_new_endpoint_out_left;
-static hexapod_leg_t m_new_endpoint_out_right;
-static hexapod_leg_t m_new_endpoint_in_left;
-static hexapod_leg_t m_new_endpoint_in_right;
-*/
-
 
 void hexapod_init()
 {
@@ -280,7 +254,7 @@ int32_t hexapod_get_next_seq_value(uint32_t leg_nr, hexapod_leg_t *leg)
     
     if(leg_nr == 0)
     {
-        NRF_LOG_PRINTF("%d, %d: %d\t%d\t%d\n", p_leg_data->count, p_leg_data->frames, leg->leg_top, leg->leg_mid, leg->leg_bot);
+        //NRF_LOG_PRINTF("%d, %d: %d\t%d\t%d\n", p_leg_data->count, p_leg_data->frames, leg->leg_top, leg->leg_mid, leg->leg_bot);
     }
     
     if(p_leg_data->is_moving == false)
