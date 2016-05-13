@@ -92,6 +92,7 @@
 #define ADC_SEND_INTERVAL                   10                                  /** Send battery voltage every 10 samples*/    
 
 //static bool first_adc_measurement = true;
+static bool battery_low = false;
 static nrf_saadc_value_t adc_buf[2];
 APP_TIMER_DEF(m_battery_timer_id);                                               /**< Battery measurement timer. */
 APP_TIMER_DEF(m_battery_low_led_timer_id);
@@ -135,7 +136,7 @@ void saadc_event_handler(nrf_drv_saadc_evt_t const * p_event)
         uint32_t          err_code;
 
         NRF_PPI->CHENCLR = (PPI_CHENCLR_CH10_Enabled << PPI_CHENCLR_CH10_Pos);
-        nrf_gpio_pin_toggle(27);
+        //nrf_gpio_pin_toggle(27);
         
         adc_result = p_event->data.done.p_buffer[0];
 
@@ -176,9 +177,11 @@ void saadc_event_handler(nrf_drv_saadc_evt_t const * p_event)
             }
         }
         
-        //if battery voltage is below 3.2V for MAX_NR_OF_LOW_SAMPLES samples we shut down the servos
+        //if battery voltage is below 3.3V for MAX_NR_OF_LOW_SAMPLES samples we shut down the servos
 
-        if(batt_lvl_in_milli_volts < 3200)
+        
+        
+        if((batt_lvl_in_milli_volts < 3300) && (battery_low == false))
         {
             batt_low_count++;
             
@@ -186,13 +189,12 @@ void saadc_event_handler(nrf_drv_saadc_evt_t const * p_event)
             {
                 //Shutdown
                 hexapod_shutdown();
-                //stop adc measuring
-                err_code = app_timer_stop(m_battery_timer_id);
-                APP_ERROR_CHECK(err_code);
+                battery_low = true;
+                
                 //blink led 3 and 4
+                LEDS_INVERT(BSP_LED_2_MASK);
                 err_code = app_timer_start(m_battery_low_led_timer_id, BATTERY_LOW_LEG_BLINKING_INTERVAL, NULL);
                 APP_ERROR_CHECK(err_code);
-                LEDS_INVERT(BSP_LED_2_MASK);
             }
         }
         else
@@ -252,15 +254,20 @@ static void battery_level_meas_timeout_handler(void * p_context)
 {
     UNUSED_PARAMETER(p_context);
 
-    //uint32_t err_code;
+    uint32_t err_code;
     adc_configure();
     
-    NRF_PPI->CH[10].TEP = (uint32_t)&NRF_SAADC->TASKS_SAMPLE;
-    NRF_PPI->CH[10].EEP = (uint32_t)&NRF_TIMER4->EVENTS_COMPARE[0];
-    NRF_PPI->CHENSET = (PPI_CHENSET_CH10_Enabled << PPI_CHENSET_CH10_Pos);
-    
-    //err_code = nrf_drv_saadc_sample();
-    //APP_ERROR_CHECK(err_code);
+    if(battery_low == false)
+    {
+        NRF_PPI->CH[10].TEP = (uint32_t)&NRF_SAADC->TASKS_SAMPLE;
+        NRF_PPI->CH[10].EEP = (uint32_t)&NRF_TIMER4->EVENTS_COMPARE[0];
+        NRF_PPI->CHENSET = (PPI_CHENSET_CH10_Enabled << PPI_CHENSET_CH10_Pos);
+    }
+    else
+    {
+        err_code = nrf_drv_saadc_sample();
+        APP_ERROR_CHECK(err_code);
+    }
 }
 
 static void battery_low_led_timeout_handler(void * p_context)
