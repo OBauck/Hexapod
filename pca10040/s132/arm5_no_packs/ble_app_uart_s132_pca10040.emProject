@@ -18,15 +18,16 @@
       arm_target_debug_interface_type="ADIv5"
       arm_target_device_name="nRF52832_xxAA"
       arm_target_interface_type="SWD"
-      c_preprocessor_definitions="BLE_STACK_SUPPORT_REQD;BOARD_PCA10040;NRF52_PAN_12;NRF52_PAN_15;NRF52_PAN_20;NRF52_PAN_30;NRF52_PAN_31;NRF52_PAN_36;NRF52_PAN_51;NRF52_PAN_53;NRF52_PAN_54;NRF52_PAN_55;NRF52_PAN_58;NRF52_PAN_62;NRF52_PAN_63;NRF52_PAN_64;CONFIG_GPIO_AS_PINRESET;S132;NRF_LOG_USES_RTT=1;NRF52;SOFTDEVICE_PRESENT;SWI_DISABLE0;NO_VTOR_COFNIG"
-      c_user_include_directories="$(PackagesDir)/CMSIS_4/CMSIS/Include;../../../config/ble_app_uart_s132_pca10040;../../../config;../../../../../../components/ble/ble_advertising;../../../../../../components/ble/ble_services/ble_nus;../../../../../../components/ble/common;../../../../../../components/drivers_nrf/common;../../../../../../components/drivers_nrf/config;../../../../../../components/drivers_nrf/delay;../../../../../../components/drivers_nrf/gpiote;../../../../../../components/drivers_nrf/hal;../../../../../../components/drivers_nrf/pstorage;../../../../../../components/drivers_nrf/uart;../../../../../../components/libraries/button;../../../../../../components/libraries/experimental_section_vars;../../../../../../components/libraries/fifo;../../../../../../components/libraries/fstorage;../../../../../../components/libraries/fstorage/config;../../../../../../components/libraries/timer;../../../../../../components/libraries/uart;../../../../../../components/libraries/util;../../../../../../components/softdevice/common/softdevice_handler;../../../../../../components/softdevice/s132/headers;../../../../../../components/softdevice/s132/headers/nrf52;../../../../../../components/toolchain;../../../../../bsp;../../../../../../../RTT/RTT"
-      debug_entry_point_symbol="No"
+      c_preprocessor_definitions="BLE_STACK_SUPPORT_REQD;BOARD_PCA10040;NRF52_PAN_12;NRF52_PAN_15;NRF52_PAN_20;NRF52_PAN_30;NRF52_PAN_31;NRF52_PAN_36;NRF52_PAN_51;NRF52_PAN_53;NRF52_PAN_54;NRF52_PAN_55;NRF52_PAN_58;NRF52_PAN_62;NRF52_PAN_63;NRF52_PAN_64;CONFIG_GPIO_AS_PINRESET;S132;NRF_LOG_USES_RTT=1;NRF52;SOFTDEVICE_PRESENT;SWI_DISABLE0;NO_VTOR_CONFIG"
+      c_user_include_directories="$(PackagesDir)/CMSIS_4/CMSIS/Include;../../../config/ble_app_uart_s132_pca10040;../../../config;../../../../../../components/ble/ble_advertising;../../../../../../components/ble/ble_services/ble_nus;../../../../../../components/ble/common;../../../../../../components/drivers_nrf/common;../../../../../../components/drivers_nrf/config;../../../../../../components/drivers_nrf/delay;../../../../../../components/drivers_nrf/gpiote;../../../../../../components/drivers_nrf/hal;../../../../../../components/drivers_nrf/pstorage;../../../../../../components/drivers_nrf/uart;../../../../../../components/libraries/button;../../../../../../components/libraries/experimental_section_vars;../../../../../../components/libraries/fifo;../../../../../../components/libraries/fstorage;../../../../../../components/libraries/fstorage/config;../../../../../../components/libraries/timer;../../../../../../components/libraries/uart;../../../../../../components/libraries/util;../../../../../../components/softdevice/common/softdevice_handler;../../../../../../components/softdevice/s132/headers;../../../../../../components/softdevice/s132/headers/nrf52;../../../../../../components/toolchain;../../../../../bsp;../../../../../../../RTT/RTT;../../../../../../components/libraries/scheduler;../../../../../../components/drivers_nrf/saadc"
+      debug_additional_load_file="C:/NordicSemi/Softdevices/s132_nrf52_2.0.1/s132_nrf52_2.0.1_softdevice.hex"
       debug_register_definition_file="$(PackagesDir)/nRF/XML/nrf52_Registers.xml"
+      debug_start_from_entry_point_symbol="No"
       debug_target_connection="J-Link"
       gcc_entry_point="Reset_Handler"
       linker_memory_map_file="$(PackagesDir)/nRF/XML/nRF52832_xxAA_MemoryMap.xml"
       linker_section_placement_file="$(StudioDir)/targets/Cortex_M/flash_placement.xml"
-      linker_section_placement_macros="FLASH_START=0x1C000;SRAM_START=0x20002080"
+      linker_section_placement_macros="FLASH_START=0x1C000;RAM_START=0x20002080"
       macros="DeviceHeaderFile=$(PackagesDir)/nRF/CMSIS/Device/Include/nrf.h;DeviceLibraryIdentifier=M4lf;DeviceSystemFile=$(PackagesDir)/nRF/CMSIS/Device/Source/system_nrf52.c;DeviceVectorsFile=$(PackagesDir)/nRF/Source/nrf52_Vectors.s;DeviceFamily=nRF"
       package_dependencies="nRF"
       project_directory=""
@@ -38,7 +39,6 @@
       <folder Name="Application">
         <file file_name="../../../main.c" />
         <file file_name="../../../pwm_driver.c" />
-        <file file_name="../../../servo_driver.c" />
         <file file_name="../../../hexapod.c" />
       </folder>
       <folder Name="Board Support">
@@ -63,6 +63,8 @@
         <file file_name="../../../../../../components/drivers_nrf/gpiote/nrf_drv_gpiote.c" />
         <file file_name="../../../../../../components/drivers_nrf/uart/nrf_drv_uart.c" />
         <file file_name="../../../../../../components/drivers_nrf/pstorage/pstorage.c" />
+        <file file_name="../../../../../../components/drivers_nrf/saadc/nrf_drv_saadc.c" />
+        <file file_name="../../../../../../components/drivers_nrf/hal/nrf_saadc.c" />
       </folder>
       <folder Name="nRF_Libraries">
         <file file_name="../../../../../../components/libraries/button/app_button.c" />
@@ -74,19 +76,18 @@
         <file file_name="../../../../../../components/libraries/fstorage/fstorage.c" />
         <file file_name="../../../../../../components/libraries/util/nrf_assert.c" />
         <file file_name="../../../../../../components/libraries/util/nrf_log.c" />
+        <file file_name="../../../../../../components/libraries/scheduler/app_scheduler.c" />
       </folder>
       <folder Name="nRF_SoftDevice">
         <file file_name="../../../../../../components/softdevice/s132/doc/s132_nrf52_2.0.0_licence_agreement.txt" />
         <file file_name="../../../../../../components/softdevice/common/softdevice_handler/softdevice_handler.c" />
       </folder>
+      <folder Name="nRF_Segger_RTT">
+        <file file_name="../../../../../../external/segger_rtt/SEGGER_RTT_printf.c" />
+      </folder>
       <folder Name="::CMSIS" />
       <folder Name="::Device" />
       <configuration Name="Common" filter="c;cpp;cxx;cc;h;s;asm;inc" />
-      <folder Name="nRF_Segger_RTT">
-        <file file_name="../../../../../../external/segger_rtt/SEGGER_RTT_printf.c" />
-        <file file_name="$(StudioDir)/samples/SEGGER_RTT.c" />
-        <file file_name="$(StudioDir)/samples/SEGGER_RTT_SES.c" />
-      </folder>
     </folder>
     <folder Name="CMSIS Files">
       <file file_name="$(DeviceHeaderFile)" />
@@ -96,6 +97,12 @@
           default_code_section=".init"
           default_const_section=".init_rodata" />
       </file>
+    </folder>
+    <folder Name="RTT Files">
+      <file file_name="$(StudioDir)/samples/SEGGER_RTT.c" />
+      <file file_name="$(StudioDir)/samples/SEGGER_RTT.h" />
+      <file file_name="$(StudioDir)/samples/SEGGER_RTT_Conf.h" />
+      <file file_name="$(StudioDir)/samples/SEGGER_RTT_SES.c" />
     </folder>
     <folder Name="Script Files">
       <file file_name="$(PackagesDir)/nRF/Scripts/nRF_Target.js">
