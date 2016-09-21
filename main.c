@@ -685,9 +685,6 @@ int main(void)
     
     hexapod_init();
     
-    nrf_gpio_cfg_output(27);
-    //hexapod_move_sideways(true, 10);
-    
     // Enter main loop.
     for (;;)
     {

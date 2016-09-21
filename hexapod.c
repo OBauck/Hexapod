@@ -4,7 +4,7 @@
 #include <math.h>
 #include "nrf.h"
 #include "hexapod.h"
-#include "pwm_driver.h"
+#include "servo_driver.h"
 #include "nrf_log.h"
 #include "nrf_delay.h"
 

@@ -40,7 +40,7 @@
   <Watches active="0" update="Never" />
  </Watch4>
  <Files>
-  <SessionOpenFile useTextEdit="1" useBinaryEdit="0" codecName="Default" x="28" debugPath="../../../main.c" y="29" path="../../../main.c" left="0" selected="1" name="unnamed" top="0" />
+  <SessionOpenFile useTextEdit="1" useBinaryEdit="0" codecName="Default" x="2" debugPath="../../../main.c" y="347" path="../../../main.c" left="0" selected="1" name="unnamed" top="331" />
  </Files>
  <ARMCrossStudioWindow activeProject="nrf52832_xxaa_s132" autoConnectTarget="J-Link" debugSearchFileMap="" fileDialogInitialDirectory="" fileDialogDefaultFilter="*.c" autoConnectCapabilities="3711" debugSearchPath="" buildConfiguration="Debug" />
 </session>
