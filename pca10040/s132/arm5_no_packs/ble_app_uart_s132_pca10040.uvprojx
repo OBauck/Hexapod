@@ -463,14 +463,14 @@
               </FileOption>
             </File>
             <File>
-              <FileName>pwm_driver.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\..\..\pwm_driver.c</FilePath>
-            </File>
-            <File>
               <FileName>hexapod.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\..\..\hexapod.c</FilePath>
+            </File>
+            <File>
+              <FileName>servo_driver.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\servo_driver.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -2243,14 +2243,14 @@
               </FileOption>
             </File>
             <File>
-              <FileName>pwm_driver.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\..\..\pwm_driver.c</FilePath>
-            </File>
-            <File>
               <FileName>hexapod.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\..\..\hexapod.c</FilePath>
+            </File>
+            <File>
+              <FileName>servo_driver.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\servo_driver.c</FilePath>
             </File>
           </Files>
         </Group>

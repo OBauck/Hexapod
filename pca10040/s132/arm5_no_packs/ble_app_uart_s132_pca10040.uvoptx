@@ -315,7 +315,7 @@
           <SizeOfObject>0</SizeOfObject>
           <BreakByAccess>0</BreakByAccess>
           <BreakIfRCount>0</BreakIfRCount>
-          <Filename>..\..\..\pwm_driver.c</Filename>
+          <Filename>C:\NordicSemi\SDK\nRF5_SDK_11.0.0\examples\MyProjects\Hexapod\pwm_driver.c</Filename>
           <ExecCommand></ExecCommand>
           <Expression></Expression>
         </Bp>
@@ -331,7 +331,7 @@
           <SizeOfObject>0</SizeOfObject>
           <BreakByAccess>0</BreakByAccess>
           <BreakIfRCount>0</BreakIfRCount>
-          <Filename>..\..\..\pwm_driver.c</Filename>
+          <Filename>C:\NordicSemi\SDK\nRF5_SDK_11.0.0\examples\MyProjects\Hexapod\pwm_driver.c</Filename>
           <ExecCommand></ExecCommand>
           <Expression></Expression>
         </Bp>
@@ -379,7 +379,7 @@
           <SizeOfObject>0</SizeOfObject>
           <BreakByAccess>0</BreakByAccess>
           <BreakIfRCount>0</BreakIfRCount>
-          <Filename>..\..\..\pwm_driver.c</Filename>
+          <Filename>C:\NordicSemi\SDK\nRF5_SDK_11.0.0\examples\MyProjects\Hexapod\pwm_driver.c</Filename>
           <ExecCommand></ExecCommand>
           <Expression></Expression>
         </Bp>
@@ -446,8 +446,8 @@
       <Focus>0</Focus>
       <tvExpOptDlg>0</tvExpOptDlg>
       <bDave2>0</bDave2>
-      <PathWithFileName>..\..\..\pwm_driver.c</PathWithFileName>
-      <FilenameWithoutPath>pwm_driver.c</FilenameWithoutPath>
+      <PathWithFileName>..\..\..\hexapod.c</PathWithFileName>
+      <FilenameWithoutPath>hexapod.c</FilenameWithoutPath>
       <RteFlg>0</RteFlg>
       <bShared>0</bShared>
     </File>
@@ -459,8 +459,8 @@
       <Focus>0</Focus>
       <tvExpOptDlg>0</tvExpOptDlg>
       <bDave2>0</bDave2>
-      <PathWithFileName>..\..\..\hexapod.c</PathWithFileName>
-      <FilenameWithoutPath>hexapod.c</FilenameWithoutPath>
+      <PathWithFileName>..\..\..\servo_driver.c</PathWithFileName>
+      <FilenameWithoutPath>servo_driver.c</FilenameWithoutPath>
       <RteFlg>0</RteFlg>
       <bShared>0</bShared>
     </File>
